@@ -84,83 +84,36 @@ export default function MemoryWeaver() {
       const savedTrends = trendsSnapshot.docs.map(doc => doc.data().trendDescription);
       const trendsContext = savedTrends.length > 0 ? `Consider these saved trends: ${savedTrends.join(', ')}.` : '';
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: `Generate a complete Evercrafted wreath design package based on this memory/emotion: "${memory}". 
-        Use this Emotion Profile: ${JSON.stringify(emotionProfile)}.
-        ${trendsContext} If relevant, incorporate elements from the saved trends into the design and explain how they align with the generated blueprint in the trend_alignment field.`,
-        config: {
-          systemInstruction: `You are Evercrafted, a deterministic floral design engine. Convert emotion into structured, buildable wreath designs. Follow the strict execution flow: Emotion Parsing -> Blueprint Generation -> Prompt Generation -> Build Instructions. Output MUST be valid JSON matching the schema. Your tone is professional, editorial, and inspiring.`,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              wreath_id: { type: Type.STRING },
-              name: { type: Type.STRING, description: "A creative name for this design" },
-              size_in: { type: Type.NUMBER },
-              emotion_profile: {
-                type: Type.OBJECT,
-                properties: {
-                  colors: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  contrast: { type: Type.STRING, description: "low|medium|high" },
-                  shapes: { type: Type.STRING, description: "rounded|mixed|angular" },
-                  density: { type: Type.STRING, description: "airy|balanced|full" },
-                  textures: { type: Type.STRING, description: "soft|mixed|sharp" },
-                  intent: { type: Type.STRING }
-                }
-              },
-              blueprint: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    element: { type: Type.STRING },
-                    category: { type: Type.STRING, description: "greenery|focal|filler|accent" },
-                    clock_position: { type: Type.STRING },
-                    angle_deg: { type: Type.NUMBER },
-                    radius: { type: Type.STRING, description: "inner|mid|outer" },
-                    density: { type: Type.STRING, description: "low|medium|high" },
-                    stem_count: { type: Type.NUMBER }
-                  }
-                }
-              },
-              render_prompt: { type: Type.STRING, description: "Midjourney/DALL-E prompt for luxury faux botanical render" },
-              build_guide: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Step-by-step physical construction instructions"
-              },
-              trend_alignment: { type: Type.STRING, description: "How the saved trends were incorporated and aligned with the design" }
-            }
-          }
-        }
+      const response = await fetch('/blueprint/from-emotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: `${memory}. Context: ${trendsContext}` })
       });
 
-      if (response.text) {
-        const parsedResult = JSON.parse(response.text);
-        
-        // Ensure the parsed result uses the emotion profile we generated
-        parsedResult.emotion_profile = emotionProfile;
+      if (!response.ok) throw new Error('Failed to generate blueprint');
+      const parsedResult = await response.json();
+      
+      // Ensure the parsed result uses the emotion profile we generated
+      parsedResult.emotion_profile = emotionProfile;
 
-        // Run Orchestrator
-        const { report } = await runOrchestrator(parsedResult, emotionProfile);
-        
-        setResult({ ...parsedResult, report });
+      // Run Orchestrator
+      const { report } = await runOrchestrator(parsedResult, emotionProfile);
+      
+      setResult({ ...parsedResult, report });
 
-        // Save to Projects
-        try {
-          await createProject({
-            userId: user.uid,
-            name: (parsedResult.name || 'Untitled Design').substring(0, 199),
-            source: 'Memory Weaver',
-            blueprint: parsedResult.blueprint,
-            render: parsedResult.render_prompt,
-            status: 'active'
-          });
-          setSaved(true);
-        } catch (error) {
-          console.error('Error saving project:', error);
-        }
+      // Save to Projects
+      try {
+        await createProject({
+          userId: user.uid,
+          name: (parsedResult.name || 'Untitled Design').substring(0, 199),
+          source: 'Memory Weaver',
+          blueprint: parsedResult.blueprint,
+          render: parsedResult.render_prompt,
+          status: 'active'
+        });
+        setSaved(true);
+      } catch (error) {
+        console.error('Error saving project:', error);
       }
     } catch (error) {
       console.error('Error generating blueprint:', error);

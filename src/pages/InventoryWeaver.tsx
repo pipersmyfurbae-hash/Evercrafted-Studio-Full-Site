@@ -47,12 +47,12 @@ export default function InventoryWeaver() {
         `${item.name} (${item.category}, ${item.role}, Qty: ${item.qtyOnHand})`
       ).join(', ');
 
-      const response = await fetch('/api/generate-blueprint', {
+      const response = await fetch('/blueprint/from-inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `Generate a wreath design using ONLY these inventory items: ${inventoryContext}`,
-          context: { inventory: inventory.map(i => i.name) }
+          blueprint: [], // Or pass current blueprint context if applicable
+          inventory: inventory
         })
       });
 

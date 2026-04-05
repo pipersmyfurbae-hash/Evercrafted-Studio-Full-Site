@@ -162,23 +162,27 @@ export default function DesignStudio() {
     }
     setIsGeneratingBlueprint(true);
     try {
-      // Use the new Engine Pipeline: Memory (prompt) -> Emotion -> Formula -> Blueprint
-      const { blueprint: compiledBlueprint, emotionProfile, renderPrompt } = await runEnginePipeline(
-        designPrompt,
-        'Crescent', // Default formula for now
-        inventory,
-        24 // Default diameter
-      );
+      const response = await fetch('/blueprint/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: designPrompt,
+          formula: 'Crescent',
+          inventory: inventory,
+          diameter: 24
+        })
+      });
+
+      if (!response.ok) throw new Error('Generation failed');
+      const compiledBlueprint = await response.json();
 
       setLocalBlueprint({
         ...compiledBlueprint,
-        emotion_profile: emotionProfile,
-        renderPrompt: renderPrompt,
         palette: { 
-          focal: emotionProfile.colors[0] || '#f43f5e', 
-          greenery: emotionProfile.colors[1] || '#22c55e', 
-          filler: emotionProfile.colors[2] || '#eab308', 
-          accent: emotionProfile.colors[3] || '#3b82f6' 
+          focal: '#f43f5e', 
+          greenery: '#22c55e', 
+          filler: '#eab308', 
+          accent: '#3b82f6' 
         }
       });
       
@@ -186,7 +190,7 @@ export default function DesignStudio() {
       setSelectedBlueprintId(compiledBlueprint.id);
       setHasUnsavedChanges(true);
       
-      toast.success('Blueprint generated via Evercrafted Engine Pipeline!');
+      toast.success('Blueprint generated via Evercrafted Engine!');
     } catch (error) {
       console.error("Blueprint generation failed:", error);
       toast.error('Failed to generate blueprint');

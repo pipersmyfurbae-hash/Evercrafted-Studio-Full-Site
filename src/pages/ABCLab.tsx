@@ -10,6 +10,9 @@ import { auth } from '../lib/firebase';
 
 import { WreathCanvas } from '../components/WreathCanvas';
 
+import { createProject } from '../services/projectService';
+import { toast } from 'sonner';
+
 export const ABCLab: React.FC = () => {
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   const [dna, setDna] = useState<WreathDNA | null>(null);
@@ -18,6 +21,8 @@ export const ABCLab: React.FC = () => {
   const [savedDNA, setSavedDNA] = useState<SavedWreathDNA[]>([]);
   const [dnaName, setDnaName] = useState('');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [debug, setDebug] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchSavedDNA();
@@ -37,10 +42,31 @@ export const ABCLab: React.FC = () => {
   };
 
   const saveCurrentDNA = async () => {
-    if (!dna || !dnaName) return;
-    await saveDNA(dnaName, dna);
-    setDnaName('');
-    fetchSavedDNA();
+    if (!dna || !dnaName || !auth.currentUser) return;
+    setSaving(true);
+    try {
+      // 1. Save DNA (legacy)
+      await saveDNA(dnaName, dna);
+      
+      // 2. Save as Project (unified)
+      await createProject({
+        userId: auth.currentUser.uid,
+        name: dnaName,
+        source: 'ABCLab',
+        blueprint: blueprint?.elements || [],
+        render: '',
+        status: 'active'
+      });
+      
+      setDnaName('');
+      fetchSavedDNA();
+      toast.success('Design saved to projects!');
+    } catch (error) {
+      console.error('Error saving design:', error);
+      toast.error('Failed to save design');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadDNA = (saved: SavedWreathDNA) => {
@@ -90,6 +116,9 @@ export const ABCLab: React.FC = () => {
       <div className="flex gap-4 mb-4">
         <button onClick={() => seedBlueprint('Crescent', 'Cozy & Calm')} className="bg-gold text-black px-4 py-2 rounded">Seed Blueprint</button>
         <button onClick={() => mutate('Crescent')} className="bg-sage text-white px-4 py-2 rounded" disabled={!dna}>Mutate DNA</button>
+        <button onClick={() => setDebug(!debug)} className={`px-4 py-2 rounded ${debug ? 'bg-red-500 text-white' : 'bg-neutral-200 text-black'}`}>
+          {debug ? 'Hide Debug' : 'Show Debug'}
+        </button>
         <div className="flex gap-2">
           <input className="border p-2" placeholder="DNA Name" value={dnaName} onChange={(e) => setDnaName(e.target.value)} />
           <button onClick={saveCurrentDNA} className="bg-gold text-black px-4 py-2 rounded" disabled={!dna || !dnaName}>Save DNA</button>
@@ -98,7 +127,7 @@ export const ABCLab: React.FC = () => {
       
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 bg-surface p-4 rounded">
-          {blueprint && <WreathCanvas blueprint={blueprint} />}
+          {blueprint && <WreathCanvas blueprint={blueprint} debug={debug} />}
         </div>
         <div className="bg-surface p-4 rounded">
           <h2 className="text-lg mb-2">Metrics</h2>

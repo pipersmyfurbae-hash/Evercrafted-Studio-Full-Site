@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { PenTool, Undo, Redo, Save, Download, RefreshCw, Layers, FolderOpen, Palette, Sparkles, Scale, Camera, Flower, GripVertical, Eye, EyeOff, ChevronUp, ChevronDown } from 'lucide-react';
+import { PenTool, Undo, Redo, Save, Download, RefreshCw, Layers, FolderOpen, Palette, Sparkles, Scale, Camera, Flower, GripVertical, Eye, EyeOff, ChevronUp, ChevronDown, Bug } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -18,7 +16,15 @@ import { DesignIntelligencePanel } from '../components/DesignIntelligencePanel';
 import { runOrchestrator } from '../services/BlueprintOrchestrator';
 import { EngineElement, EngineBlueprint, Role } from '../types';
 import { generatePlacement } from '../services/engine/placementEngine';
-import { engineToUI } from '../services/transformer';
+import { engineToUI, normalizeBlueprint } from '../services/transformer';
+import { runEnginePipeline } from '../services/enginePipeline';
+import { buildRenderLayout, generateDebugOverlay } from '../services/engine/evercrafted-engine';
+import { exportBlueprintSVG } from '../services/engine/blueprint-exporter';
+import { generateBlueprintPDF } from '../services/engine/blueprint-pdf';
+import { publishBlueprint } from '../services/engine/marketplace-service';
+import { MarketplaceBlueprint } from '../services/engine/marketplace-schema';
+import { createProject } from '../services/projectService';
+import { ShoppingCart } from 'lucide-react';
 
 enum OperationType {
   CREATE = 'create',
@@ -128,6 +134,8 @@ export default function DesignStudio() {
   const [isBalancing, setIsBalancing] = useState(false);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [isMimicking, setIsMimicking] = useState(false);
+  const [debug, setDebug] = useState(false);
+  const [designPrompt, setDesignPrompt] = useState('');
   const [suggestions, setSuggestions] = useState<{description: string, action: string, params: any}[]>([]);
   const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -148,87 +156,37 @@ export default function DesignStudio() {
   );
 
   const handleGenerateBlueprint = async () => {
+    if (!designPrompt) {
+      toast.error('Please enter a design prompt');
+      return;
+    }
     setIsGeneratingBlueprint(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const model = "gemini-3.1-pro-preview";
-      
-      const response = await ai.models.generateContent({
-        model,
-        contents: `Generate a luxury floral wreath blueprint based on this request: "${prompt}".
-        
-        CRITICAL: You must construct the wreath MATHEMATICALLY using the Engine Pack schema.
-        - Define "clusters" with center (theta), spread, and density.
-        - Define "open_arc" as [start, end] degrees for negative space.
-        - Use a unique "seed" string.
-        - Inventory available: ${JSON.stringify(inventory.map(i => i.name))}.
-        
-        Return a JSON object matching the EngineBlueprint schema.`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              formula: { type: Type.STRING },
-              seed: { type: Type.STRING },
-              diameter: { type: Type.NUMBER },
-              open_arc: {
-                type: Type.ARRAY,
-                items: { type: Type.NUMBER },
-                minItems: 2,
-                maxItems: 2
-              },
-              clusters: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    center: { type: Type.NUMBER },
-                    spread: { type: Type.NUMBER },
-                    density: { type: Type.NUMBER }
-                  }
-                }
-              },
-              renderPrompt: { type: Type.STRING }
-            },
-            required: ["title", "formula", "seed", "diameter", "open_arc", "clusters", "renderPrompt"]
-          }
-        }
-      });
-      
-      const data = JSON.parse(response.text);
-      
-      // Use the Placement Engine to generate the actual elements
-      const blueprintTemplate: EngineBlueprint = {
-        id: Date.now().toString(),
-        seed: data.seed || Math.random().toString(),
-        formula: data.formula,
-        open_arc: data.open_arc || [0, 0],
-        clusters: data.clusters || [],
-        elements: [], // Will be populated by placement engine
-        base: {
-          form: 'circular',
-          diameter_inches: data.diameter || 24,
-          frame_type: 'wire_wreath_frame'
-        }
-      };
-
-      // Generate placements
-      blueprintTemplate.elements = generatePlacement(blueprintTemplate);
+      // Use the new Engine Pipeline: Memory (prompt) -> Emotion -> Formula -> Blueprint
+      const { blueprint: compiledBlueprint, emotionProfile, renderPrompt } = await runEnginePipeline(
+        designPrompt,
+        'Crescent', // Default formula for now
+        inventory,
+        24 // Default diameter
+      );
 
       setLocalBlueprint({
-        ...blueprintTemplate,
-        title: data.title,
-        renderPrompt: data.renderPrompt,
-        palette: { focal: '#f43f5e', greenery: '#22c55e', filler: '#eab308', accent: '#3b82f6' }
+        ...compiledBlueprint,
+        emotion_profile: emotionProfile,
+        renderPrompt: renderPrompt,
+        palette: { 
+          focal: emotionProfile.colors[0] || '#f43f5e', 
+          greenery: emotionProfile.colors[1] || '#22c55e', 
+          filler: emotionProfile.colors[2] || '#eab308', 
+          accent: emotionProfile.colors[3] || '#3b82f6' 
+        }
       });
       
-      setBlueprints(prev => [blueprintTemplate, ...prev]);
-      setSelectedBlueprintId(blueprintTemplate.id);
+      setBlueprints(prev => [compiledBlueprint, ...prev]);
+      setSelectedBlueprintId(compiledBlueprint.id);
       setHasUnsavedChanges(true);
       
-      toast.success('Blueprint generated via Engine Pack!');
+      toast.success('Blueprint generated via Evercrafted Engine Pipeline!');
     } catch (error) {
       console.error("Blueprint generation failed:", error);
       toast.error('Failed to generate blueprint');
@@ -272,110 +230,60 @@ export default function DesignStudio() {
 
   const handleExportSvg = () => {
     if (!localBlueprint) return;
-    const svgString = generateSvgString(localBlueprint);
+    const elements = getElements(localBlueprint);
+    const layout = buildRenderLayout(elements, 600, 600);
+    const svgString = exportBlueprintSVG(layout);
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'blueprint.svg';
+    link.download = `evercrafted-blueprint-${localBlueprint.id || 'design'}.svg`;
     link.click();
+    toast.success('SVG Blueprint exported!');
   };
 
   const handleExportPdf = () => {
     if (!localBlueprint) return;
-    const doc = new jsPDF();
-    const title = localBlueprint.title || 'Evercrafted Wreath Blueprint';
-    
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(40, 40, 40);
-    doc.text(title, 105, 20, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
-
-    // 1. Element List Table
     const elements = getElements(localBlueprint);
-    doc.setFontSize(14);
-    doc.setTextColor(40, 40, 40);
-    doc.text('1. Material List', 14, 45);
-    
-    autoTable(doc, {
-      head: [['Role', 'Layer', 'Theta', 'Radius', 'Scale']],
-      body: elements.map((e: any) => [
-        e.role.toUpperCase(), 
-        e.layer.toUpperCase(), 
-        `${Math.round(e.theta)}°`, 
-        e.radius.toFixed(2), 
-        e.scale.toFixed(1)
-      ]),
-      startY: 50,
-      theme: 'striped',
-      headStyles: { fillColor: [40, 40, 40] },
-      styles: { fontSize: 9 }
-    });
-
-    // 2. Build Sequence
-    let currentY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFontSize(14);
-    doc.text('2. Build Sequence', 14, currentY);
-    
-    const steps = [
-      { role: 'greenery', label: 'Step 1: Establish the Base (Greenery)' },
-      { role: 'focal', label: 'Step 2: Place Focal Elements' },
-      { role: 'filler', label: 'Step 3: Add Filler & Texture' },
-      { role: 'accent', label: 'Step 4: Final Accents & Detail' }
-    ];
-
-    doc.setFontSize(10);
-    currentY += 10;
-    steps.forEach(step => {
-      const stepElements = elements.filter((e: any) => e.role === step.role);
-      if (stepElements.length > 0) {
-        doc.setFont('helvetica', 'bold');
-        doc.text(step.label, 14, currentY);
-        doc.setFont('helvetica', 'normal');
-        currentY += 6;
-        stepElements.forEach((e: any) => {
-          doc.text(`• Place ${e.role} at ${Math.round(e.theta)}° (${e.layer} layer)`, 20, currentY);
-          currentY += 5;
-        });
-        currentY += 5;
-      }
-    });
-
-    doc.save(`${title.replace(/\s+/g, '_')}_Blueprint.pdf`);
+    const layout = buildRenderLayout(elements, 600, 600);
+    const svgString = exportBlueprintSVG(layout);
+    generateBlueprintPDF(svgString);
+    toast.success('PDF Blueprint generated for printing!');
   };
 
-  const generateSvgString = (blueprint: any) => {
-    const elements = getElements(blueprint);
-    const svgElements = elements.map((item: any, idx: number) => {
-      const angleRad = (item.angle_deg - 90) * (Math.PI / 180);
-      const maxRadius = 280;
-      const radius = maxRadius * getRadiusPercent(item.radius);
-      const x = 300 + Math.cos(angleRad) * radius;
-      const y = 300 + Math.sin(angleRad) * radius;
-      const size = 30 + (item.stem_count * 4);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const handlePublish = async () => {
+    if (!localBlueprint || !user) return;
+    setIsPublishing(true);
+    try {
+      const elements = getElements(localBlueprint);
+      const layout = buildRenderLayout(elements, 600, 600);
       
-      return `
-        <g transform="translate(${x}, ${y})">
-          <circle r="${size / 2}" fill="${getCategoryColor(item.category)}" fill-opacity="0.8" stroke="white" stroke-width="1" />
-          <text dy=".3em" text-anchor="middle" font-size="8" fill="white" font-family="sans-serif">${idx + 1}</text>
-        </g>`;
-    }).join('');
+      const listing: MarketplaceBlueprint = {
+        id: `MP-${Date.now().toString(36).toUpperCase()}`,
+        title: localBlueprint.name || 'Untitled Wreath',
+        description: `A luxury ${localBlueprint.formula || 'custom'} wreath design.`,
+        emotionTags: localBlueprint.emotion_profile?.intent ? [localBlueprint.emotion_profile.intent] : [],
+        styleTags: [localBlueprint.formula || 'custom'],
+        blueprint: localBlueprint.blueprint || [],
+        renderPreview: generatedImage || '',
+        price: 19, // Default price
+        creatorId: user.uid,
+        createdAt: new Date().toISOString(),
+        downloads: 0,
+        rating: 5
+      };
 
-    return `
-      <svg width="600" height="600" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
-        <rect width="600" height="600" fill="#fcfbf9" />
-        <circle cx="300" cy="300" r="290" fill="none" stroke="#e5e7eb" stroke-width="1" />
-        <circle cx="300" cy="300" r="200" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4" />
-        <circle cx="300" cy="300" r="100" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4" />
-        ${svgElements}
-        <text x="300" y="580" text-anchor="middle" font-size="12" font-family="serif" fill="#1a1a1a">${blueprint.title || 'Wreath Blueprint'}</text>
-      </svg>
-    `;
+      publishBlueprint(listing);
+      toast.success('Blueprint published to Evercrafted Marketplace!');
+    } catch (error) {
+      console.error("Publishing failed:", error);
+      toast.error('Failed to publish blueprint');
+    } finally {
+      setIsPublishing(false);
+    }
   };
+
   const [scoreReport, setScoreReport] = useState<any>(null);
 
   useEffect(() => {
@@ -423,7 +331,7 @@ export default function DesignStudio() {
       // If it's a legacy blueprint, we might need to handle it, 
       // but for now we assume it matches EngineBlueprint or has elements
       if (!bp.elements && bp.blueprint) {
-        bp.elements = Array.isArray(bp.blueprint) ? bp.blueprint : [];
+        bp.elements = normalizeBlueprint(bp.blueprint);
       }
       
       setLocalBlueprint(bp);
@@ -704,14 +612,26 @@ export default function DesignStudio() {
     if (!localBlueprint || !user) return;
     setIsSaving(true);
     try {
+      // 1. Save to blueprints (legacy)
       const bpRef = doc(db, 'blueprints', localBlueprint.id);
       await setDoc(bpRef, {
         ...localBlueprint,
         userId: user.uid,
         updatedAt: new Date().toISOString()
       });
+      
+      // 2. Save as Project (unified)
+      await createProject({
+        userId: user.uid,
+        name: localBlueprint.name || 'Untitled Design',
+        source: 'Design Studio',
+        blueprint: localBlueprint.elements || [],
+        render: generatedImage || localBlueprint.renderPrompt || '',
+        status: 'active'
+      });
+      
       setHasUnsavedChanges(false);
-      toast.success('Blueprint saved successfully');
+      toast.success('Blueprint saved to studio and projects!');
     } catch (error) {
       console.error("Save failed:", error);
       toast.error('Failed to save blueprint');
@@ -815,6 +735,9 @@ export default function DesignStudio() {
             <Button variant="ghost" size="icon" className="hover:bg-muted" onClick={handleBalanceSuggestions} disabled={isBalancing}>
               <Scale className="w-4 h-4" />
             </Button>
+            <Button variant="ghost" size="icon" className={`hover:bg-muted ${debug ? 'text-red-500' : ''}`} onClick={() => setDebug(!debug)}>
+              <Bug className="w-4 h-4" />
+            </Button>
             <label className="cursor-pointer">
               <input type="file" className="hidden" accept="image/*" onChange={handleStyleMimic} />
               <div className={`p-2 rounded-md hover:bg-muted ${isMimicking ? 'opacity-50' : ''}`}>
@@ -834,6 +757,15 @@ export default function DesignStudio() {
                 <SelectItem value="pdf" className="text-[10px] uppercase tracking-widest">PDF Blueprint</SelectItem>
               </SelectContent>
             </Select>
+            <Button 
+              variant="outline" 
+              className="display-text px-4 h-10 border-foreground/10 hover:bg-muted gap-2"
+              onClick={handlePublish}
+              disabled={!localBlueprint || isPublishing}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>{isPublishing ? 'Publishing...' : 'Publish'}</span>
+            </Button>
             <Button 
               className="display-text px-8 h-10 bg-foreground text-background hover:opacity-80 transition-opacity" 
               onClick={handleSave}
@@ -970,20 +902,30 @@ export default function DesignStudio() {
           </div>
 
           <div className="p-8 border-b border-foreground/5">
+            <span className="display-text opacity-40">Design Intent (Memory)</span>
+          </div>
+          <div className="p-8 space-y-4 border-b border-foreground/5">
+            <textarea 
+              className="w-full bg-muted/50 border-none p-3 text-[10px] font-bold focus:ring-1 ring-foreground/10 outline-none min-h-[100px] resize-none" 
+              placeholder="Describe the memory or emotion for this wreath..."
+              value={designPrompt}
+              onChange={(e) => setDesignPrompt(e.target.value)}
+            />
+            <Button 
+              className="w-full" 
+              onClick={handleGenerateBlueprint} 
+              disabled={isGeneratingBlueprint}
+            >
+              {isGeneratingBlueprint ? 'Generating...' : 'Generate Blueprint'}
+            </Button>
+          </div>
+
+          <div className="p-8 border-b border-foreground/5">
             <span className="display-text opacity-40">Properties</span>
           </div>
           <div className="p-8">
             {localBlueprint && (
               <div>
-                <div className="mb-12">
-                  <Button 
-                    className="w-full" 
-                    onClick={handleGenerateBlueprint} 
-                    disabled={isGeneratingBlueprint}
-                  >
-                    {isGeneratingBlueprint ? 'Generating...' : 'Generate Blueprint'}
-                  </Button>
-                </div>
                 <div className="mb-12">
                   <DesignIntelligencePanel blueprint={localBlueprint} />
                 </div>
@@ -1134,11 +1076,14 @@ export default function DesignStudio() {
             <div className="absolute w-[580px] h-[580px] rounded-full border-[24px] border-[#4a3728]/10 blur-[2px]" />
             <div className="absolute w-[560px] h-[560px] rounded-full border-[1px] border-[#4a3728]/5" />
             
-            <div className="opacity-[0.08]">
-              <div className="w-[600px] h-[600px] border border-foreground rounded-full" />
-              <div className="w-[450px] h-[450px] border border-foreground rounded-full" />
-              <div className="w-[300px] h-[300px] border border-foreground rounded-full" />
-              <div className="w-[150px] h-[150px] border border-foreground rounded-full" />
+            <div className={`flex items-center justify-center ${debug ? "opacity-30" : "opacity-[0.08]"}`}>
+              {generateDebugOverlay(600, 600).rings.map((ring, idx) => (
+                <div 
+                  key={`ring-${idx}`}
+                  className="absolute border border-foreground rounded-full"
+                  style={{ width: ring.radius * 2, height: ring.radius * 2 }}
+                />
+              ))}
             </div>
 
             {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map(deg => (
@@ -1147,10 +1092,10 @@ export default function DesignStudio() {
                 className="absolute w-[640px] h-px flex justify-between px-1" 
                 style={{ transform: `rotate(${deg}deg)` }} 
               >
-                <span className="text-[9px] font-mono opacity-20" style={{ transform: `rotate(${-deg}deg)` }}>
+                <span className={`text-[9px] font-mono ${debug ? 'opacity-60 font-bold' : 'opacity-20'}`} style={{ transform: `rotate(${-deg}deg)` }}>
                   {((deg / 30 + 3) % 12 || 12)}
                 </span>
-                <span className="text-[9px] font-mono opacity-20" style={{ transform: `rotate(${-deg}deg)` }}>
+                <span className={`text-[9px] font-mono ${debug ? 'opacity-60 font-bold' : 'opacity-20'}`} style={{ transform: `rotate(${-deg}deg)` }}>
                   {((deg / 30 + 9) % 12 || 12)}
                 </span>
               </div>
@@ -1172,28 +1117,21 @@ export default function DesignStudio() {
             )}
 
             {/* Render Blueprint Elements */}
-            {getElements(localBlueprint)
+            {buildRenderLayout(getElements(localBlueprint)
               ?.filter((item: EngineElement) => {
                 const isVisible = layerVisibility[item.role] !== false;
                 return isVisible;
-              })
-              ?.sort((a: EngineElement, b: EngineElement) => {
-                const aIdx = layerOrder.indexOf(a.role);
-                const bIdx = layerOrder.indexOf(b.role);
+              }), 0, 0)
+              ?.sort((a: any, b: any) => {
+                const aIdx = layerOrder.indexOf(a.category);
+                const bIdx = layerOrder.indexOf(b.category);
                 return bIdx - aIdx; // Render bottom layers first
               })
-              ?.map((item: EngineElement, idx: number) => {
+              ?.map((item: any, idx: number) => {
                 const isSelected = selectedElementIdx === idx;
-                const invItem = getInventoryItem(item.role);
-                const categoryColor = getCategoryColor(item.role);
+                const invItem = getInventoryItem(item.category);
+                const categoryColor = getCategoryColor(item.category);
                 
-                // Base position
-                const angleRad = (item.theta - 90) * (Math.PI / 180);
-                const maxRadius = 300;
-                const baseRadius = maxRadius * item.radius;
-                const x = Math.cos(angleRad) * baseRadius;
-                const y = Math.sin(angleRad) * baseRadius;
-
                 const size = 32 * (item.scale || 1);
                 const offset = size / 2;
 
@@ -1204,7 +1142,7 @@ export default function DesignStudio() {
                       isSelected ? 'z-30' : 'z-10'
                     }`}
                     style={{ 
-                      transform: `translate(${x}px, ${y}px)`,
+                      transform: `translate(${item.x}px, ${item.y}px)`,
                       opacity: isSelected ? 1 : 0.8,
                       width: `${size}px`,
                       height: `${size}px`,
@@ -1213,6 +1151,11 @@ export default function DesignStudio() {
                     }}
                     onClick={() => setSelectedElementIdx(idx)}
                   >
+                    {debug && (
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[8px] px-1 py-0.5 rounded whitespace-nowrap pointer-events-none z-50">
+                        {item.category.toUpperCase()} | {Math.round(item.angle_deg)}°
+                      </div>
+                    )}
                     {invItem?.svg ? (
                       <div 
                         className={`w-full h-full transition-all ${isSelected ? 'drop-shadow-xl scale-125' : 'grayscale opacity-60 hover:grayscale-0 hover:opacity-100'} [&>svg]:w-full [&>svg]:h-full`} 

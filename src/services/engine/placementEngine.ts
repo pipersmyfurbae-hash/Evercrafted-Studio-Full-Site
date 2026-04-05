@@ -1,76 +1,121 @@
 // src/services/engine/placementEngine.ts
 
-import { EngineBlueprint, EngineElement, Cluster } from '../../types';
+import { EngineBlueprint, EngineElement } from "../../types";
 
-/**
- * Generates element placements based on the EngineBlueprint's cluster definitions.
- * Uses Vogel's model for organic distribution within clusters.
- */
-export const generatePlacement = (blueprint: EngineBlueprint): EngineElement[] => {
-  const elements: EngineElement[] = [];
-  const { clusters, seed, open_arc } = blueprint;
-  
-  // Deterministic random generator based on seed
-  const seededRandom = (s: string) => {
-    let hash = 0;
-    for (let i = 0; i < s.length; i++) {
-      hash = (hash << 5) - hash + s.charCodeAt(i);
-      hash |= 0;
-    }
-    return () => {
-      hash = (hash * 16807) % 2147483647;
-      return (hash - 1) / 2147483646;
-    };
-  };
+export function generatePlacement(
+  blueprint: EngineBlueprint
+): EngineElement[] {
+  const placed: EngineElement[] = [];
 
-  const rng = seededRandom(seed || 'evercrafted');
+  blueprint.clusters.forEach((cluster, clusterIndex) => {
+    const elementCount = Math.floor(cluster.density * 10);
 
-  clusters.forEach((cluster, clusterIdx) => {
-    const { center, spread, count, bias = 0.5, shape = 0.5 } = cluster;
-    
-    for (let i = 0; i < count; i++) {
-      // Vogel's model / Golden Angle distribution for organic scattering
-      const goldenAngle = 137.508;
-      const r = Math.sqrt(i / count); // Vogel's radius
-      const thetaOffset = i * goldenAngle;
-      
-      // Map Vogel's model to our cluster properties
-      // Spread controls the angular width
-      const angularJitter = (rng() - 0.5) * spread * r;
-      const theta = (center + angularJitter + (thetaOffset % spread) - (spread / 2) + 360) % 360;
-      
-      // Radius calculation with bias and shape
-      // bias: 0 (inner) to 1 (outer)
-      // shape: 0 (circular) to 1 (elongated/radial)
-      const radiusBase = bias + (rng() - 0.5) * 0.2 * (1 - shape);
-      const radius = Math.max(0.1, Math.min(0.95, radiusBase + (r * 0.15 * shape)));
-      
-      // Determine layer based on radius
-      let layer: "inner" | "mid" | "outer" | "edge" = "mid";
-      if (radius < 0.4) layer = "inner";
-      else if (radius < 0.7) layer = "mid";
-      else if (radius < 0.9) layer = "outer";
-      else layer = "edge";
+    for (let i = 0; i < elementCount; i++) {
+      const theta =
+        cluster.center +
+        randomSpread(cluster.spread);
 
-      // Role assignment (simplified for now, can be improved)
-      const role = clusterIdx === 0 ? "greenery" : clusterIdx === 1 ? "focal" : "filler";
+      if (isInsideOpenArc(theta, blueprint.open_arc)) continue;
 
-      // Collision detection & Open Arc enforcement
-      const isInOpenArc = open_arc && theta >= open_arc[0] && theta <= open_arc[1];
-      
-      if (!isInOpenArc) {
-        elements.push({
-          id: `e-${clusterIdx}-${i}-${Math.floor(rng() * 1000)}`,
-          role: role as any,
-          theta,
-          radius,
-          layer,
-          scale: 0.8 + rng() * 0.4,
-          rotation: rng() * 360
-        });
-      }
+      const radius = randomRange(0.6, 0.95);
+      const role = assignRole(i);
+
+      placed.push({
+        id: `el_${clusterIndex}_${i}`,
+        role: role,
+        theta: normalize(theta),
+        radius,
+        layer: radiusToLayer(radius),
+        scale: roleToScale(role),
+        rotation: randomRange(-20, 20)
+      });
     }
   });
 
-  return elements;
-};
+  return resolveCollisions(placed, blueprint);
+}
+
+// 🧮 Helpers (REQUIRED)
+function randomSpread(spread: number) {
+  return (Math.random() - 0.5) * spread;
+}
+
+function randomRange(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
+
+function normalize(theta: number) {
+  return (theta + 360) % 360;
+}
+
+function isInsideOpenArc(theta: number, arc: [number, number]) {
+  const [start, end] = arc;
+  // Handle circular wrap-around if needed, but for now simple range
+  if (start <= end) {
+    return theta >= start && theta <= end;
+  } else {
+    // Arc crosses 0/360
+    return theta >= start || theta <= end;
+  }
+}
+
+function radiusToLayer(radius: number): "inner" | "mid" | "outer" | "edge" {
+  if (radius < 0.4) return "inner";
+  if (radius < 0.7) return "mid";
+  if (radius < 0.9) return "outer";
+  return "edge";
+}
+
+function assignRole(i: number): any {
+  if (i === 0) return "focal";
+  if (i < 3) return "secondary";
+  if (i < 6) return "accent";
+  return "filler";
+}
+
+function roleToScale(role: string) {
+  switch (role) {
+    case "focal": return 1.3;
+    case "secondary": return 1.0;
+    case "accent": return 0.8;
+    default: return 0.6;
+  }
+}
+
+// 🧱 Collision Engine (CRITICAL FOR REALISM)
+function resolveCollisions(
+  elements: EngineElement[],
+  blueprint: EngineBlueprint
+): EngineElement[] {
+  const result: EngineElement[] = [];
+
+  elements.forEach((el) => {
+    const tooClose = result.some((existing) => {
+      const dist = angularDistance(el.theta, existing.theta);
+      return dist < getCollisionThreshold(el.role, blueprint);
+    });
+
+    if (!tooClose) result.push(el);
+  });
+
+  return result;
+}
+
+function angularDistance(a: number, b: number) {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 360 - diff);
+}
+
+function getCollisionThreshold(role: string, blueprint: EngineBlueprint) {
+  const collision = blueprint.constraints?.collision;
+  if (!collision) {
+    switch (role) {
+      case "focal": return 18;
+      case "secondary": return 12;
+      case "accent": return 8;
+      default: return 6;
+    }
+  }
+  
+  return (collision as any)[role] || 6;
+}

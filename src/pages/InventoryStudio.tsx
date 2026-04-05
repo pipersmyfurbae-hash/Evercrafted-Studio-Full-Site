@@ -6,10 +6,14 @@ import { auth } from '../lib/firebase';
 export const InventoryStudio: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [newItem, setNewItem] = useState<Omit<InventoryItem, 'id'>>({
+    sku: '',
     name: '',
     category: 'focal',
+    color: '',
     colorFamily: '',
+    stock: 0,
     quantity: 0,
+    role: 'focal',
     visualWeight: 'medium'
   });
 
@@ -27,7 +31,17 @@ export const InventoryStudio: React.FC = () => {
   const addItem = async () => {
     if (!auth.currentUser || !newItem.name) return;
     await addInventoryItem(auth.currentUser.uid, newItem);
-    setNewItem({ name: '', category: 'focal', colorFamily: '', quantity: 0, visualWeight: 'medium' });
+    setNewItem({ 
+      sku: '',
+      name: '', 
+      category: 'focal', 
+      color: '',
+      colorFamily: '', 
+      stock: 0,
+      quantity: 0, 
+      role: 'focal',
+      visualWeight: 'medium' 
+    });
     fetchInventory();
   };
 
@@ -38,21 +52,42 @@ export const InventoryStudio: React.FC = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-light mb-6">Inventory Studio</h1>
+      <h1 className="text-2xl font-light mb-6 font-serif">Inventory Studio</h1>
 
-      <div className="bg-surface p-4 rounded mb-6">
-        <h2 className="text-lg mb-4">Add New Item</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <input className="border p-2" placeholder="Name" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} />
-          <select className="border p-2" value={newItem.category} onChange={(e) => setNewItem({...newItem, category: e.target.value as any})}>
-            {['base', 'greenery', 'focal', 'filler', 'accent', 'ribbon'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
-          </select>
-          <input className="border p-2" placeholder="Color Family" value={newItem.colorFamily} onChange={(e) => setNewItem({...newItem, colorFamily: e.target.value})} />
-          <input className="border p-2" type="number" placeholder="Quantity" value={newItem.quantity} onChange={(e) => setNewItem({...newItem, quantity: parseInt(e.target.value)})} />
-          <select className="border p-2" value={newItem.visualWeight} onChange={(e) => setNewItem({...newItem, visualWeight: e.target.value as any})}>
-            {['light', 'medium', 'heavy'].map(w => <option key={w} value={w}>{w}</option>)}
-          </select>
-          <button onClick={addItem} className="bg-gold text-black px-4 py-2 rounded">Add Item</button>
+      <div className="bg-surface p-6 rounded-lg mb-8 border border-foreground/5">
+        <h2 className="text-lg mb-6 display-text opacity-60">Add New Item</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest opacity-40">SKU</label>
+            <input className="w-full border p-3 bg-background" placeholder="e.g. ROSE-RED-01" value={newItem.sku} onChange={(e) => setNewItem({...newItem, sku: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest opacity-40">Name</label>
+            <input className="w-full border p-3 bg-background" placeholder="e.g. Red Silk Rose" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest opacity-40">Category</label>
+            <select className="w-full border p-3 bg-background" value={newItem.category} onChange={(e) => setNewItem({...newItem, category: e.target.value})}>
+              {['focal', 'secondary', 'accent', 'filler', 'greenery', 'base', 'ribbon'].map(cat => <option key={cat} value={cat}>{cat.toUpperCase()}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest opacity-40">Color</label>
+            <input className="w-full border p-3 bg-background" placeholder="e.g. Crimson" value={newItem.color} onChange={(e) => setNewItem({...newItem, color: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest opacity-40">Stock (Units)</label>
+            <input className="w-full border p-3 bg-background" type="number" value={newItem.stock} onChange={(e) => setNewItem({...newItem, stock: parseInt(e.target.value)})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-widest opacity-40">Role</label>
+            <select className="w-full border p-3 bg-background" value={newItem.role} onChange={(e) => setNewItem({...newItem, role: e.target.value as any})}>
+              {['focal', 'secondary', 'accent', 'filler', 'greenery'].map(role => <option key={role} value={role}>{role.toUpperCase()}</option>)}
+            </select>
+          </div>
+          <div className="md:col-span-3">
+            <button onClick={addItem} className="w-full bg-foreground text-background px-8 py-4 rounded hover:opacity-90 transition-opacity display-text uppercase tracking-widest">Add to Inventory</button>
+          </div>
         </div>
       </div>
 

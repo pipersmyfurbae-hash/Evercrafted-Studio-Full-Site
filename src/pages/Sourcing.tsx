@@ -5,13 +5,13 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { MapPin, Search, Loader2, Store } from 'lucide-react';
+import { MapPin, Search, Loader2, Store, Globe, ExternalLink } from 'lucide-react';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default function Sourcing() {
   const [queryText, setQuery] = useState('');
-  const [results, setResults] = useState<any[] | string>('');
+  const [results, setResults] = useState<{text: string, groundingChunks?: any[]} | any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchType, setSearchType] = useState<'maps' | 'search' | 'local'>('maps');
 
@@ -19,7 +19,7 @@ export default function Sourcing() {
     e.preventDefault();
     if (!queryText.trim()) return;
     setLoading(true);
-    setResults('');
+    setResults(null);
 
     try {
       if (searchType === 'local') {
@@ -39,11 +39,15 @@ export default function Sourcing() {
           }
         });
 
-        setResults(response.text || 'No results found.');
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        setResults({
+          text: response.text || 'No detailed information found.',
+          groundingChunks
+        });
       }
     } catch (error) {
       console.error('Error searching:', error);
-      setResults('Failed to perform search.');
+      setResults({ text: 'Failed to perform search. Please check your API key and try again.' });
     } finally {
       setLoading(false);
     }
@@ -129,15 +133,48 @@ export default function Sourcing() {
           {results && (
             <div className="mt-12 p-8 bg-white/60 border border-primary/5 rounded-none animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h3 className="display-text text-xs text-primary/40 uppercase tracking-widest mb-6">Results</h3>
-              <div className="prose prose-sm max-w-none text-primary/80 font-sans leading-relaxed whitespace-pre-wrap">
-                {typeof results === 'string' ? results : (
+              <div className="prose prose-sm max-w-none text-primary/80 font-sans leading-relaxed">
+                {Array.isArray(results) ? (
                   <div className="grid gap-4">
                     {results.map((item: any) => (
-                      <div key={item.id} className="flex justify-between p-4 border rounded">
-                        <span>{item.name} - ${item.costPerUnit}</span>
-                        <Button>Purchase</Button>
+                      <div key={item.id} className="flex justify-between p-4 border border-primary/5 bg-white/40">
+                        <span className="font-serif italic">{item.name} - ${item.costPerUnit}</span>
+                        <Button size="sm" variant="ghost" className="text-[10px] uppercase tracking-widest">View in Inventory</Button>
                       </div>
                     ))}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <p className="whitespace-pre-wrap font-serif italic leading-relaxed">{results.text}</p>
+                    
+                    {results.groundingChunks && results.groundingChunks.length > 0 && (
+                      <div className="pt-6 border-t border-primary/5 space-y-3">
+                        <p className="text-[10px] uppercase tracking-widest text-primary/40 font-sans font-bold">Verified Sources & Locations</p>
+                        <div className="flex flex-wrap gap-2">
+                          {results.groundingChunks.map((chunk: any, i: number) => {
+                            const uri = chunk.web?.uri || chunk.maps?.uri;
+                            const title = chunk.web?.title || chunk.maps?.title || 'View Source';
+                            const isMap = !!chunk.maps;
+                            
+                            if (!uri) return null;
+                            
+                            return (
+                              <a 
+                                key={i}
+                                href={uri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 hover:bg-primary/10 text-[10px] font-medium transition-colors border border-primary/5"
+                              >
+                                {isMap ? <MapPin className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                                {title}
+                                <ExternalLink className="w-2 h-2 opacity-50" />
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -59,6 +59,8 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+import { createProject } from '../services/projectService';
+
 export default function MemoryWeaver() {
   const { user } = useAuth();
   const [memory, setMemory] = useState('');
@@ -145,23 +147,19 @@ export default function MemoryWeaver() {
         
         setResult({ ...parsedResult, report });
 
-        // Save to Firestore (only if it passes?)
-        // The user wants to "ful all things through the orchestrator", so maybe we only save if it passes?
-        // Let's save it anyway, but mark it as "needs repair" if the score is low.
+        // Save to Projects
         try {
-          const newDocRef = doc(collection(db, 'blueprints'));
-          await setDoc(newDocRef, {
-            ...parsedResult,
-            report,
-            id: newDocRef.id,
-            title: (parsedResult.name || 'Untitled Design').substring(0, 199),
+          await createProject({
             userId: user.uid,
-            createdAt: new Date().toISOString(),
-            sourceMemory: memory
+            name: (parsedResult.name || 'Untitled Design').substring(0, 199),
+            source: 'Memory Weaver',
+            blueprint: parsedResult.blueprint,
+            render: parsedResult.render_prompt,
+            status: 'active'
           });
           setSaved(true);
         } catch (error) {
-          handleFirestoreError(error, OperationType.CREATE, 'blueprints');
+          console.error('Error saving project:', error);
         }
       }
     } catch (error) {
@@ -313,7 +311,7 @@ export default function MemoryWeaver() {
                             <p className="text-[10px] text-primary/40 uppercase tracking-widest">{item.category} • {item.radius} radius</p>
                           </div>
                           <div className="text-right space-y-1">
-                            <p className="font-mono text-[10px] text-primary bg-primary/5 px-2 py-0.5 rounded-none inline-block">{item.clock_position}</p>
+                            <p className="font-mono text-[10px] text-primary bg-primary/5 px-2 py-0.5 rounded-none inline-block">{item.angle_deg}°</p>
                             <p className="text-[10px] text-primary/40 uppercase tracking-widest block">{item.stem_count} stems</p>
                           </div>
                         </div>

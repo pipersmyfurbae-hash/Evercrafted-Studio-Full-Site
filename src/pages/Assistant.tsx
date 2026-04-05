@@ -3,12 +3,18 @@ import { GoogleGenAI } from '@google/genai';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { MessageSquare, Send, User, Bot } from 'lucide-react';
+import { MessageSquare, Send, User, Bot, Globe, MapPin, ExternalLink } from 'lucide-react';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+interface Message {
+  role: 'user' | 'model';
+  text: string;
+  groundingChunks?: any[];
+}
+
 export default function Assistant() {
-  const [messages, setMessages] = useState<{role: 'user'|'model', text: string}[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -18,9 +24,13 @@ export default function Assistant() {
 
   useEffect(() => {
     chatRef.current = ai.chats.create({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-3-flash-preview',
       config: {
-        systemInstruction: 'You are an expert floral designer and assistant for the Evercrafted platform. You help users design wreaths, choose flowers, understand color theory, and manage their inventory. Your tone is professional, editorial, and inspiring.',
+        systemInstruction: 'You are an expert floral designer and assistant for the Evercrafted platform. You help users design wreaths, choose flowers, understand color theory, and manage their inventory. You have access to Google Search and Google Maps to provide real-time information about trends, suppliers, and locations. Your tone is professional, editorial, and inspiring.',
+        tools: [
+          { googleSearch: {} },
+          { googleMaps: {} }
+        ]
       }
     });
   }, []);
@@ -44,7 +54,13 @@ export default function Assistant() {
 
     try {
       const response = await chatRef.current.sendMessage({ message: userMsg });
-      setMessages(prev => [...prev, { role: 'model', text: response.text }]);
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      
+      setMessages(prev => [...prev, { 
+        role: 'model', 
+        text: response.text || 'I processed your request.',
+        groundingChunks 
+      }]);
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => [...prev, { role: 'model', text: 'Sorry, I encountered an error.' }]);
@@ -64,7 +80,7 @@ export default function Assistant() {
           Floral Assistant
         </h1>
         <p className="text-muted-foreground max-w-xl">
-          Chat with our expert floral design AI for inspiration, technical advice, or inventory help.
+          Chat with our expert floral design AI for inspiration, technical advice, or inventory help. Now with real-time search and maps.
         </p>
       </header>
 
@@ -76,7 +92,7 @@ export default function Assistant() {
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-primary/30 space-y-4">
               <MessageSquare className="w-12 h-12 opacity-10" />
-              <p className="font-serif italic text-sm">Ask me about floral design, color theory, or wreath construction.</p>
+              <p className="font-serif italic text-sm">Ask me about floral design, color theory, or find local suppliers.</p>
             </div>
           ) : (
             messages.map((msg, idx) => (
@@ -86,7 +102,7 @@ export default function Assistant() {
                     <Bot className="w-5 h-5" />
                   </div>
                 )}
-                <div className={`px-6 py-4 rounded-none max-w-[80%] shadow-sm ${
+                <div className={`px-6 py-4 rounded-none max-w-[80%] shadow-sm space-y-4 ${
                   msg.role === 'user' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'bg-white text-primary border border-primary/5'
@@ -94,6 +110,35 @@ export default function Assistant() {
                   <p className={`whitespace-pre-wrap text-sm ${msg.role === 'model' ? 'font-serif italic leading-relaxed' : 'font-sans font-medium tracking-tight'}`}>
                     {msg.text}
                   </p>
+                  
+                  {msg.groundingChunks && msg.groundingChunks.length > 0 && (
+                    <div className="pt-4 border-t border-primary/5 space-y-2">
+                      <p className="text-[10px] uppercase tracking-widest text-primary/40 font-sans font-bold">Sources & Locations</p>
+                      <div className="flex flex-wrap gap-2">
+                        {msg.groundingChunks.map((chunk, i) => {
+                          const uri = chunk.web?.uri || chunk.maps?.uri;
+                          const title = chunk.web?.title || chunk.maps?.title || 'View Source';
+                          const isMap = !!chunk.maps;
+                          
+                          if (!uri) return null;
+                          
+                          return (
+                            <a 
+                              key={i}
+                              href={uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 hover:bg-primary/10 text-[10px] font-medium transition-colors border border-primary/5"
+                            >
+                              {isMap ? <MapPin className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+                              {title}
+                              <ExternalLink className="w-2 h-2 opacity-50" />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {msg.role === 'user' && (
                   <div className="w-10 h-10 rounded-none bg-primary/10 flex items-center justify-center text-primary/60 shrink-0">
@@ -109,7 +154,7 @@ export default function Assistant() {
                 <Bot className="w-5 h-5" />
               </div>
               <div className="px-6 py-4 rounded-none bg-white text-primary/40 border border-primary/5 text-sm font-serif italic">
-                Thinking...
+                Searching and thinking...
               </div>
             </div>
           )}

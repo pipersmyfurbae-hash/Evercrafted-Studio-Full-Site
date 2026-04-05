@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { auth } from '../lib/firebase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { engineToUI } from '../services/transformer';
+import { engineToUI, normalizeBlueprint } from '../services/transformer';
 
 export const OrderStudio: React.FC = () => {
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
@@ -64,15 +64,16 @@ export const OrderStudio: React.FC = () => {
     doc.text(`Wreath Order: ${blueprint.blueprint_id}`, 10, 10);
     doc.text(`Customer: ${customerName}`, 10, 20);
     
-    const elements = blueprint.blueprint || (blueprint.elements ? blueprint.elements.map(engineToUI) : []);
+    const rawElements = blueprint.blueprint || (blueprint.elements ? blueprint.elements.map(engineToUI) : []);
+    const elements = normalizeBlueprint(rawElements);
     const tableData = elements.map((item: any) => [
-      item.element || item.role, 
-      item.category || item.role, 
-      item.clock_position
+      item.element, 
+      item.category, 
+      `${item.angle_deg || 0}°`
     ]);
     
     autoTable(doc, {
-      head: [['Element', 'Category', 'Position']],
+      head: [['Element', 'Category', 'Angle']],
       body: tableData,
       startY: 30,
     });

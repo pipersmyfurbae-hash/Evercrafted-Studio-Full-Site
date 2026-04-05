@@ -30,9 +30,9 @@ export class PaletteEngine {
     const items = palette[category];
     if (items.length === 0) return null;
 
-    // Simple matching: prioritize colorFamily match, then visualWeight
-    const match = items.find(item => item.colorFamily === colorBias && item.visualWeight === visualWeight) ||
-                  items.find(item => item.colorFamily === colorBias) ||
+    // Simple matching: prioritize color match, then visualWeight
+    const match = items.find(item => (item.color === colorBias || item.colorFamily === colorBias) && item.visualWeight === visualWeight) ||
+                  items.find(item => item.color === colorBias || item.colorFamily === colorBias) ||
                   items[0];
 
     return match;

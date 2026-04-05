@@ -5,7 +5,7 @@ import { InventoryItem } from '../../types';
 export const getInventory = async (userId: string): Promise<InventoryItem[]> => {
   const q = query(collection(db, 'inventory'), where('userId', '==', userId));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as InventoryItem));
 };
 
 export const addInventoryItem = async (userId: string, item: Omit<InventoryItem, 'id'>) => {

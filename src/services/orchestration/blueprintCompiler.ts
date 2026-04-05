@@ -2,7 +2,6 @@
 
 import { Blueprint, WreathDNA, InventoryItem, EngineBlueprint } from '../../types';
 import { generatePlacement } from '../engine/placementEngine';
-import { PaletteEngine } from '../engine/paletteEngine';
 import { engineToUI } from '../transformer';
 
 /**
@@ -20,9 +19,19 @@ export const compileBlueprint = (
     id: rawAIOutput.blueprint_id || `EC-${Date.now().toString(36).toUpperCase()}`,
     seed: rawAIOutput.seed || Math.random().toString(36).substr(2, 9),
     formula: formula,
+    diameter: diameter_inches,
     open_arc: rawAIOutput.open_arc || [0, 0],
     clusters: rawAIOutput.clusters || [],
-    elements: []
+    elements: [],
+    constraints: {
+      max_elements: 100,
+      collision: {
+        focal: 18,
+        secondary: 12,
+        accent: 8,
+        filler: 6
+      }
+    }
   };
 
   // 2. Generate placements

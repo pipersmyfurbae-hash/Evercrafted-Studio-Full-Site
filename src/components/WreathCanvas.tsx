@@ -1,77 +1,112 @@
 // src/components/WreathCanvas.tsx
 
 import React, { useState } from 'react';
-import { Stage, Layer, Circle, Star, Ellipse } from 'react-konva';
+import { Stage, Layer, Circle, Star, Ellipse, Line, Text, Group } from 'react-konva';
 import { Blueprint } from '../types';
-import { engineToUI } from '../services/transformer';
+import { buildRenderLayout, generateDebugOverlay, RenderElement } from '../services/engine/evercrafted-engine';
 
-export const WreathCanvas: React.FC<{ blueprint: Blueprint }> = ({ blueprint }) => {
+export const WreathCanvas: React.FC<{ blueprint: Blueprint; debug?: boolean }> = ({ blueprint, debug = false }) => {
   const width = 400;
   const height = 400;
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const radiusMap = { inner: 80, mid: 120, outer: 160, edge: 180 };
-
-  // Sort by category for correct layering
-  const categoryOrder = { greenery: 0, focal: 1, filler: 2, accent: 3, secondary: 4 };
   
-  // Use legacy blueprint array or transform new elements array
-  const elements = blueprint.blueprint || (blueprint.elements ? blueprint.elements.map(engineToUI) : []);
-  const sortedBlueprint = [...elements].sort((a: any, b: any) => {
-    const catA = (a.category || a.role) as keyof typeof categoryOrder;
-    const catB = (b.category || b.role) as keyof typeof categoryOrder;
-    return (categoryOrder[catA] || 0) - (categoryOrder[catB] || 0);
+  // Base radius for the wreath frame
+  const baseRadius = 180;
+  
+  // Use normalized blueprint array
+  const rawElements = blueprint.blueprint || (blueprint.elements ? blueprint.elements : []);
+  const layout = buildRenderLayout(rawElements as any[], width, height);
+  
+  // Sort by category for correct layering
+  const categoryOrder = { greenery: 0, focal: 1, secondary: 2, filler: 3, accent: 4 };
+  const sortedElements = [...layout].sort((a, b) => {
+    return (categoryOrder[a.category] || 0) - (categoryOrder[b.category] || 0);
   });
 
-  const [hovered, setHovered] = useState<number | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const debugOverlay = generateDebugOverlay(width, height);
 
-  const renderStem = (stem: any, i: number) => {
-    const clockPos = stem.clock_position || '12:00';
-    const [hours, minutes] = clockPos.split(':').map(Number);
-    const angleDeg = stem.theta !== undefined ? stem.theta : ((hours % 12) * 30 + (minutes / 60) * 30);
-    const angleRad = (angleDeg - 90) * (Math.PI / 180);
-    
-    const layer = stem.radius_label || stem.layer || stem.radius || 'mid';
-    const r = typeof layer === 'number' ? (layer * 180) : (radiusMap[layer as keyof typeof radiusMap] || 120);
-    
-    const x = centerX + r * Math.cos(angleRad);
-    const y = centerY + r * Math.sin(angleRad);
-
+  const renderElement = (el: RenderElement, i: number) => {
     const commonProps = {
-      x, y,
-      fill: stem.color || '#c9a96e',
-      opacity: hovered === i ? 1 : 0.8,
-      onMouseEnter: () => setHovered(i),
+      x: el.x,
+      y: el.y,
+      fill: '#c9a96e', // Default color
+      opacity: hovered === el.id ? 1 : 0.8,
+      onMouseEnter: () => setHovered(el.id),
       onMouseLeave: () => setHovered(null),
-      scaleX: stem.scale || 1,
-      scaleY: stem.scale || 1,
-      rotation: stem.rotation || 0
+      scaleX: 1,
+      scaleY: 1,
+      rotation: el.angle_deg
     };
 
-    const category = stem.category || stem.role;
-
-    switch (category) {
-      case 'focal':
-        return <Star key={i} {...commonProps} numPoints={5} innerRadius={6} outerRadius={15} rotation={angleDeg} />;
-      case 'greenery':
-        return <Ellipse key={i} {...commonProps} radiusX={15} radiusY={8} rotation={angleDeg} />;
-      case 'filler':
-        return <Circle key={i} {...commonProps} radius={4} />;
-      case 'accent':
-        return <Circle key={i} {...commonProps} radius={6} stroke="gold" strokeWidth={2} />;
-      default:
-        return <Circle key={i} {...commonProps} radius={4} />;
-    }
+    return (
+      <Group key={el.id}>
+        {el.category === 'focal' && <Star {...commonProps} numPoints={5} innerRadius={6} outerRadius={15} fill="#f43f5e" />}
+        {el.category === 'secondary' && <Star {...commonProps} numPoints={6} innerRadius={8} outerRadius={12} fill="#d4af37" />}
+        {el.category === 'greenery' && <Ellipse {...commonProps} radiusX={15} radiusY={8} fill="#4A6741" />}
+        {el.category === 'filler' && <Circle {...commonProps} radius={4} fill="#8B4513" />}
+        {el.category === 'accent' && <Circle {...commonProps} radius={6} stroke="gold" strokeWidth={2} fill="#FFD700" />}
+        {!['focal', 'secondary', 'greenery', 'filler', 'accent'].includes(el.category) && <Circle {...commonProps} radius={4} />}
+        
+        {debug && (
+          <Text 
+            x={el.x + 10} 
+            y={el.y + 10} 
+            text={`${el.element}\n${el.angle_deg}°`} 
+            fontSize={8} 
+            fill="#666" 
+            fontFamily="monospace"
+            listening={false}
+          />
+        )}
+      </Group>
+    );
   };
 
   return (
-    <Stage width={width} height={height} className="border border-surface rounded-lg bg-neutral-50">
+    <Stage width={width} height={height} className="border border-surface rounded-lg bg-neutral-50 shadow-inner">
       <Layer>
+        {/* Debug: Radius Rings */}
+        {debug && debugOverlay.rings.map((ring, idx) => (
+          <Circle 
+            key={`ring-${idx}`} 
+            x={debugOverlay.center.x} 
+            y={debugOverlay.center.y} 
+            radius={ring.radius} 
+            stroke="#ccc" 
+            strokeWidth={0.5} 
+            dash={[5, 5]} 
+            listening={false}
+          />
+        ))}
+
+        {/* Debug: Angle Lines */}
+        {debug && debugOverlay.angles.map((angleObj, i) => {
+          const rad = (angleObj.angle - 90) * (Math.PI / 180);
+          return (
+            <Line 
+              key={`line-${i}`}
+              points={[
+                debugOverlay.center.x, 
+                debugOverlay.center.y, 
+                debugOverlay.center.x + baseRadius * Math.cos(rad), 
+                debugOverlay.center.y + baseRadius * Math.sin(rad)
+              ]}
+              stroke="#eee"
+              strokeWidth={1}
+              listening={false}
+            />
+          );
+        })}
+
         {/* Frame */}
-        <Circle x={centerX} y={centerY} radius={180} stroke="#c9a96e" strokeWidth={10} />
+        <Circle x={width/2} y={height/2} radius={baseRadius} stroke="#c9a96e" strokeWidth={10} />
         
-        {/* Stems */}
-        {sortedBlueprint.map(renderStem)}
+        {/* Cluster Highlights (Designer-Grade Visual Weight) */}
+        {/* We can derive clusters from layout if needed, but the engine already grouped them */}
+        {/* For now, let's just render elements */}
+
+        {/* Elements */}
+        {sortedElements.map(renderElement)}
       </Layer>
     </Stage>
   );

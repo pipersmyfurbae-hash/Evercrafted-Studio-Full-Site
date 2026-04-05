@@ -1,10 +1,14 @@
 export interface InventoryItem {
   id: string;
+  sku: string;
   name: string;
-  category: 'base' | 'greenery' | 'focal' | 'filler' | 'accent' | 'ribbon';
-  colorFamily: string;
-  quantity: number;
-  visualWeight: 'light' | 'medium' | 'heavy';
+  category: string;
+  color: string;
+  colorFamily?: string;
+  stock: number;
+  quantity?: number;
+  role: "focal" | "secondary" | "accent" | "filler" | "greenery";
+  visualWeight?: 'light' | 'medium' | 'heavy';
 }
 
 export interface FloralAsset {
@@ -55,6 +59,18 @@ export interface CompositionFormula {
 
 export type Role = "focal" | "secondary" | "accent" | "filler" | "greenery";
 
+export type Radius = "inner" | "mid" | "outer";
+export type Category = "focal" | "secondary" | "accent" | "filler" | "greenery";
+
+export interface BlueprintElement {
+  id: string;
+  element: string;
+  category: Category;
+  angle_deg: number;
+  radius: Radius;
+  stem_count: number;
+}
+
 export interface EngineElement {
   id: string;
   role: Role;
@@ -69,18 +85,26 @@ export interface EngineElement {
 export interface Cluster {
   center: number;       // angle in degrees
   spread: number;       // width of cluster
-  count: number;        // element count
-  bias?: number;        // 0-1 (0: center, 1: edge)
-  shape?: number;       // 0-1 (0: circular, 1: elongated)
+  density: number;      // 0–1 (controls element count)
 }
 
 export interface EngineBlueprint {
   id: string;
   seed: string;
   formula: string;
+  diameter: number;
   open_arc: [number, number]; // [start_deg, end_deg]
   clusters: Cluster[];
   elements: EngineElement[];
+  constraints: {
+    max_elements: number;
+    collision: {
+      focal: number;
+      secondary: number;
+      accent: number;
+      filler: number;
+    };
+  };
   
   // Metadata for UI
   name?: string;
@@ -105,16 +129,7 @@ export interface Blueprint extends EngineBlueprint {
     quadrant_label: string;
     palette_bias: 'warm' | 'cool' | 'neutral' | 'split';
   };
-  blueprint?: Array<{
-    element: string;
-    category: 'greenery' | 'focal' | 'filler' | 'accent';
-    color: string;
-    clock_position: string;
-    angle_deg: number;
-    radius: 'inner' | 'mid' | 'outer';
-    density: 'low' | 'medium' | 'high';
-    stem_count: number;
-  }>;
+  blueprint?: BlueprintElement[];
 }
 
 export interface EmotionProfile {
@@ -144,4 +159,35 @@ export interface RepairOption {
   description: string;
   type: 'basic' | 'advanced';
   apply: (blueprint: Blueprint) => Blueprint;
+}
+
+export interface Task {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string;
+  projectId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Project {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  status: 'active' | 'on_hold' | 'completed' | 'archived';
+  deadline: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DashboardMetrics {
+  active_projects: number;
+  pending_tasks: number;
+  completed_tasks: number;
+  upcoming_deadlines: number;
 }

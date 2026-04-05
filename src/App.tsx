@@ -30,14 +30,22 @@ import MoodboardParser from './pages/MoodboardParser';
 import WorkflowAutomator from './pages/WorkflowAutomator';
 import ProductivityDashboard from './pages/ProductivityDashboard';
 import CustomerRetention from './pages/CustomerRetention';
+import ClientPortal from './pages/ClientPortal';
 import WreathRemixer from './pages/WreathRemixer';
+import Success from './pages/Success';
+import Cancel from './pages/Cancel';
 import BlueprintStudioLanding from './pages/BlueprintStudioLanding';
 import BlueprintStudioMarketing from './pages/BlueprintStudioMarketing';
 import ReverseEngineer from './pages/ReverseEngineer/page';
 import Validator from './pages/Validator/page';
 import MoodoorLanding from './pages/MoodoorLanding';
 import EmotionLensLanding from './pages/EmotionLensLanding';
+import MotionEngine from './pages/MotionEngine';
+import PlacementEditor from './pages/PlacementEditor';
 import { Toaster } from './components/ui/sonner';
+
+import { TierGuard } from './components/TierGuard';
+import Projects from './pages/Projects';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -59,18 +67,45 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
-            <Route path="memory-weaver" element={<MemoryWeaver />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="inventory-weaver" element={<InventoryWeaver />} />
-            <Route path="inventory-studio" element={<InventoryStudio />} />
-            <Route path="design-studio" element={<ABCLab />} />
-            <Route path="order-studio" element={<OrderStudio />} />
-            <Route path="visualize-with-ai" element={<VisualizeWithAI />} />
+            <Route path="dashboard" element={<ClientPortal />} />
+            <Route path="projects" element={<Projects />} />
+            
+            {/* App Routes */}
+            <Route path="apps/memory" element={<MemoryWeaver />} />
+            <Route path="apps/inventory" element={
+              <TierGuard feature="hasInventoryWeaver">
+                <InventoryWeaver />
+              </TierGuard>
+            } />
+            <Route path="apps/studio" element={
+              <TierGuard feature="hasDesignStudio">
+                <DesignStudio />
+              </TierGuard>
+            } />
+            <Route path="apps/upload" element={
+              <TierGuard feature="hasCreatorUpload">
+                <CreatorDashboard />
+              </TierGuard>
+            } />
+            <Route path="apps/motion" element={
+              <TierGuard feature="hasDesignStudio">
+                <MotionEngine />
+              </TierGuard>
+            } />
+            <Route path="apps/placement" element={
+              <TierGuard feature="hasDesignStudio">
+                <PlacementEditor />
+              </TierGuard>
+            } />
+            
             <Route path="marketplace" element={<Marketplace />} />
             <Route path="marketplace/:id" element={<ListingDetail />} />
-            <Route path="creator-dashboard" element={<CreatorDashboard />} />
+            <Route path="order-studio" element={<OrderStudio />} />
+            <Route path="productivity-dashboard" element={<ProductivityDashboard />} />
+            
+            {/* Other tools */}
+            <Route path="visualize-with-ai" element={<VisualizeWithAI />} />
             <Route path="assistant" element={<Assistant />} />
-            <Route path="image-analyzer" element={<ImageAnalyzer />} />
             <Route path="sourcing" element={<Sourcing />} />
             <Route path="market" element={<Market />} />
             <Route path="profit-predictor" element={<ProfitPredictor />} />
@@ -79,13 +114,13 @@ export default function App() {
             <Route path="inventory-vision" element={<InventoryVision />} />
             <Route path="moodboard-parser" element={<MoodboardParser />} />
             <Route path="workflow-automator" element={<WorkflowAutomator />} />
-            <Route path="productivity-dashboard" element={<ProductivityDashboard />} />
             <Route path="customer-retention" element={<CustomerRetention />} />
-            <Route path="blueprint-studio" element={<DesignStudio />} />
             <Route path="reverse-engineer" element={<ReverseEngineer />} />
             <Route path="validator" element={<Validator />} />
             <Route path="wreath-remixer" element={<WreathRemixer />} />
             <Route path="render-prompt-builder" element={<RenderPromptBuilder />} />
+            <Route path="success" element={<Success />} />
+            <Route path="cancel" element={<Cancel />} />
           </Route>
         </Routes>
       </Router>

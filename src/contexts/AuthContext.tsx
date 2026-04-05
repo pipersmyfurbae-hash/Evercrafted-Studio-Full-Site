@@ -9,6 +9,7 @@ interface UserData {
   displayName: string;
   photoURL: string;
   role: 'admin' | 'client' | 'free';
+  tier?: 'free' | 'pro' | 'studio' | 'enterprise';
   allowedApps?: string[];
 }
 

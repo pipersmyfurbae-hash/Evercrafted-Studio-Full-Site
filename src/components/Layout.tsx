@@ -18,34 +18,34 @@ import {
   Sparkles
 } from 'lucide-react';
 
+import { checkFeatureAccess, Tier } from '../services/tierService';
+
 export default function Layout() {
   const { user, userData, logout } = useAuth();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
 
   const allNavItems = [
-    { name: 'Dashboard', path: '/app', icon: LayoutDashboard },
-    { name: 'Memory Weaver', path: '/app/memory-weaver', icon: BrainCircuit },
-    { name: 'Inventory Weaver', path: '/app/inventory-weaver', icon: PackageSearch },
-    { name: 'Blueprint Studio', path: '/app/blueprint-studio', icon: PenTool },
-    { name: 'Design Studio', path: '/app/design-studio', icon: Sparkles },
-    { name: 'Order Studio', path: '/app/order-studio', icon: ShoppingBag },
-    { name: 'Inventory Studio', path: '/app/inventory-studio', icon: PackageSearch },
-    { name: 'Reverse Engineer', path: '/app/reverse-engineer', icon: BrainCircuit },
-    { name: 'Validator', path: '/app/validator', icon: CheckCircle2 },
-    { name: 'Render Prompt Builder', path: '/app/render-prompt-builder', icon: Sparkles },
-    { name: 'Assistant', path: '/app/assistant', icon: MessageSquare },
-    { name: 'Image Analyzer', path: '/app/image-analyzer', icon: ImageSearch },
-    { name: 'Sourcing', path: '/app/sourcing', icon: MapPin },
-    { name: 'Market', path: '/app/market', icon: ShoppingBag },
+    { name: 'Studio Hub', path: '/app/dashboard', icon: LayoutDashboard },
+    { name: 'Projects', path: '/app/projects', icon: PenTool },
+    { name: 'Memory Weaver', path: '/app/apps/memory', icon: BrainCircuit },
+    { name: 'Inventory Weaver', path: '/app/apps/inventory', icon: PackageSearch, feature: 'hasInventoryWeaver' },
+    { name: 'Design Studio', path: '/app/apps/studio', icon: Sparkles, feature: 'hasDesignStudio' },
+    { name: 'QACS Placement', path: '/app/apps/placement', icon: PenTool, feature: 'hasDesignStudio' },
+    { name: 'Motion Engine', path: '/app/apps/motion', icon: Sparkles, feature: 'hasDesignStudio' },
+    { name: 'Creator Studio', path: '/app/apps/upload', icon: Sparkles, feature: 'hasCreatorUpload' },
+    { name: 'Marketplace', path: '/app/marketplace', icon: ShoppingBag },
   ];
 
   const navItems = allNavItems.filter(item => {
     if (userData?.role === 'admin' || user?.email === 'thebadencompany@gmail.com') return true;
-    if (userData?.role === 'client') {
-      return userData.allowedApps?.includes(item.name);
+    
+    // If the item has a feature requirement, check it against the user's tier
+    if (item.feature) {
+      const userTier = (userData?.tier || 'free') as Tier;
+      return checkFeatureAccess(userTier, item.feature as any);
     }
-    // For development, let's show all apps to everyone so they can be tested
+
     return true; 
   });
 

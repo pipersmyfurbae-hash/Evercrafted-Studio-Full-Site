@@ -10,9 +10,17 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
         "role": { "type": "string", "enum": ["admin", "maker", "pro", "free"] },
+        "tier": { "type": "string", "enum": ["free", "pro", "studio", "enterprise"] },
+        "usage": {
+          "type": "object",
+          "properties": {
+            "designsThisMonth": { "type": "number" },
+            "lastResetDate": { "type": "string", "format": "date-time" }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "email", "role"]
+      "required": ["uid", "email", "role", "tier"]
     },
     "InventoryItem": {
       "title": "Inventory Item",
@@ -77,6 +85,41 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "trendDescription"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task for a user to complete.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "projectId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "status", "priority"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A design project containing a blueprint, render prompt, and SVG.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "blueprint": { "type": "object" },
+        "renderPrompt": { "type": "string" },
+        "svg": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "blueprint"]
     }
   },
   "firestore": {
@@ -99,6 +142,14 @@
     "/savedTrends/{trendId}": {
       "schema": "SavedTrend",
       "description": "User saved trends."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User tasks."
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User projects."
     }
   }
 }

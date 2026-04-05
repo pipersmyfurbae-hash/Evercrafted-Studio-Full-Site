@@ -8,7 +8,7 @@
 - [x] Add per-route rate limiting and basic abuse protection.
 
 ## Phase 2: Payments + entitlement reliability
-- [ ] Replace in-memory purchase tracking with durable storage.
+- [x] Replace in-memory purchase tracking with durable storage.
 - [ ] Add Stripe webhook processing (`checkout.session.completed`, refunds, disputes).
 - [ ] Add idempotency for checkout and entitlement updates.
 - [ ] Add audit logging for purchase and download actions.

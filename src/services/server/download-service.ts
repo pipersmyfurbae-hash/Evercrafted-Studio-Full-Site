@@ -3,8 +3,8 @@
 import { hasAccess } from "./purchase-verification";
 import { exportBlueprintSVG } from "../engine/blueprint-exporter";
 
-export function downloadBlueprint(userId: string, blueprint: any) {
-  if (!hasAccess(userId, blueprint.id)) {
+export async function downloadBlueprint(userId: string, blueprint: any) {
+  if (!(await hasAccess(userId, blueprint.id))) {
     throw new Error("Access denied");
   }
 

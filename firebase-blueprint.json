@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Evercrafted platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "maker", "pro", "free"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "An item in a user's craft inventory.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "colorFamily": { "type": "string" },
+        "role": { "type": "string", "enum": ["focal", "secondary", "accent", "filler", "greenery", "base", "ribbon"] },
+        "qtyOnHand": { "type": "number" },
+        "bloomDiameter": { "type": "number" },
+        "stemLength": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "costPerUnit": { "type": "number" },
+        "supplierSku": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "role", "qtyOnHand"]
+    },
+    "Blueprint": {
+      "title": "Blueprint",
+      "description": "A generated wreath design blueprint.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "base": { "type": "string" },
+        "composition": { "type": "string" },
+        "zones": { "type": "string" },
+        "elements": { "type": "string" },
+        "scores": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "WreathDNA": {
+      "title": "Wreath DNA",
+      "description": "The genetic design parameters for a wreath.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "dna": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "dna"]
+    },
+    "SavedTrend": {
+      "title": "Saved Trend",
+      "description": "A trend saved by a user for future blueprints.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "trendDescription": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "trendDescription"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "User inventory items."
+    },
+    "/blueprints/{blueprintId}": {
+      "schema": "Blueprint",
+      "description": "Generated wreath blueprints."
+    },
+    "/wreathDNA/{dnaId}": {
+      "schema": "WreathDNA",
+      "description": "User saved wreath DNA profiles."
+    },
+    "/savedTrends/{trendId}": {
+      "schema": "SavedTrend",
+      "description": "User saved trends."
+    }
+  }
+}

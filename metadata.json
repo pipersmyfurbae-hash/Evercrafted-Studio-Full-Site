@@ -1,0 +1,9 @@
+{
+  "name": "Evercrafted Studio",
+  "description": "Professional design tools for wreath makers. Design with precision from memory or inventory.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

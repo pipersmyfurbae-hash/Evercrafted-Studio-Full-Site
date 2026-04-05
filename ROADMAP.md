@@ -9,8 +9,8 @@
 
 ## Phase 2: Payments + entitlement reliability
 - [x] Replace in-memory purchase tracking with durable storage.
-- [ ] Add Stripe webhook processing (`checkout.session.completed`, refunds, disputes).
-- [ ] Add idempotency for checkout and entitlement updates.
+- [x] Add Stripe webhook processing (`checkout.session.completed`, refunds, disputes).
+- [x] Add idempotency for checkout and entitlement updates.
 - [ ] Add audit logging for purchase and download actions.
 
 ## Phase 3: Async jobs + media pipeline

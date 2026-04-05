@@ -8,8 +8,11 @@ import { analyzeWreathImage } from './src/services/vision-flower-engine.ts';
 import { generateMotion } from './src/services/motionEngine.ts';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
+import Stripe from 'stripe';
 import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
+import { createCheckoutSession, constructWebhookEvent } from './src/services/server/stripe-service.ts';
+import { recordPurchase } from './src/services/server/purchase-verification.ts';
 
 // Initialize Firebase Admin
 admin.initializeApp({
@@ -112,6 +115,47 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.post(
+    '/payments/stripe/webhook',
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
+      try {
+        const event = constructWebhookEvent(
+          req.body as Buffer,
+          req.headers['stripe-signature']
+        );
+
+        const processedRef = db.collection('stripeWebhookEvents').doc(event.id);
+        const processedDoc = await processedRef.get();
+        if (processedDoc.exists) {
+          res.json({ received: true, duplicate: true });
+          return;
+        }
+
+        if (event.type === 'checkout.session.completed') {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const userId = session.metadata?.userId;
+          const blueprintId = session.metadata?.blueprintId;
+
+          if (userId && blueprintId) {
+            await recordPurchase(userId, blueprintId, session.id);
+          }
+        }
+
+        await processedRef.set({
+          eventId: event.id,
+          type: event.type,
+          processedAt: new Date().toISOString(),
+        });
+
+        res.json({ received: true });
+      } catch (error) {
+        console.error('Stripe webhook error:', error);
+        res.status(400).send('Webhook Error');
+      }
+    }
+  );
+
   app.use(express.json({ limit: '10mb' }));
 
   const aiRouteLimiter = createRateLimiter({ maxRequests: 30, windowMs: 60_000 });
@@ -121,6 +165,34 @@ async function startServer() {
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
   });
+
+  app.post(
+    '/payments/checkout-session',
+    projectRouteLimiter,
+    requireAuth,
+    requireBodyFields(['id', 'title', 'price']),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.uid;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+
+        const { id, title, price } = req.body;
+        const checkoutUrl = await createCheckoutSession({
+          id: String(id),
+          title: String(title),
+          price: Number(price),
+          userId,
+        });
+        res.json({ checkoutUrl });
+      } catch (error) {
+        console.error('Checkout session error:', error);
+        res.status(500).json({ error: 'Failed to create checkout session' });
+      }
+    }
+  );
 
   // Blueprint Routes
   app.post('/blueprint/create', aiRouteLimiter, requireBodyFields(['prompt', 'formula', 'inventory', 'diameter']), async (req, res) => {

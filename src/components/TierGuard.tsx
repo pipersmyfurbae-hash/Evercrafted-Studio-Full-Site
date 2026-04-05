@@ -1,18 +1,21 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { checkFeatureAccess, Tier, TierLimits } from '../services/tierService';
+import { checkFeatureAccess, normalizeTier, TierLimits } from '../services/tierService';
+import { canAccessApp } from '../services/appCatalog';
 import { Loader2 } from 'lucide-react';
 
 interface TierGuardProps {
   children: React.ReactNode;
   feature?: keyof TierLimits;
+  appId?: string;
   fallbackPath?: string;
 }
 
 export const TierGuard: React.FC<TierGuardProps> = ({ 
   children, 
   feature, 
+  appId,
   fallbackPath = '/app/dashboard' 
 }) => {
   const { user, userData, loading } = useAuth();
@@ -36,10 +39,21 @@ export const TierGuard: React.FC<TierGuardProps> = ({
   }
 
   if (feature) {
-    const userTier = (userData?.tier || 'free') as Tier;
+    const userTier = normalizeTier(userData?.tier);
     const hasAccess = checkFeatureAccess(userTier, feature);
 
     if (!hasAccess) {
+      return <Navigate to={fallbackPath} replace />;
+    }
+  }
+
+  if (appId) {
+    const hasAppAccess = canAccessApp({
+      appId,
+      rawTier: normalizeTier(userData?.tier),
+      allowedApps: userData?.allowedApps,
+    });
+    if (!hasAppAccess) {
       return <Navigate to={fallbackPath} replace />;
     }
   }

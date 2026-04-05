@@ -71,54 +71,66 @@ export default function App() {
             <Route path="projects" element={<Projects />} />
             
             {/* App Routes */}
-            <Route path="apps/memory" element={<MemoryWeaver />} />
+            <Route path="apps/memory" element={<TierGuard appId="memory_weaver"><MemoryWeaver /></TierGuard>} />
             <Route path="apps/inventory" element={
-              <TierGuard feature="hasInventoryWeaver">
+              <TierGuard feature="hasInventoryWeaver" appId="inventory_weaver">
                 <InventoryWeaver />
               </TierGuard>
             } />
             <Route path="apps/studio" element={
-              <TierGuard feature="hasDesignStudio">
+              <TierGuard feature="hasDesignStudio" appId="blueprint_studio">
                 <DesignStudio />
               </TierGuard>
             } />
             <Route path="apps/upload" element={
-              <TierGuard feature="hasCreatorUpload">
+              <TierGuard feature="hasCreatorUpload" appId="creator_dashboard">
                 <CreatorDashboard />
               </TierGuard>
             } />
             <Route path="apps/motion" element={
-              <TierGuard feature="hasDesignStudio">
+              <TierGuard feature="hasDesignStudio" appId="motion_engine">
                 <MotionEngine />
               </TierGuard>
             } />
             <Route path="apps/placement" element={
-              <TierGuard feature="hasDesignStudio">
+              <TierGuard feature="hasDesignStudio" appId="ai_placement_editor">
                 <PlacementEditor />
               </TierGuard>
             } />
             
-            <Route path="marketplace" element={<Marketplace />} />
+            <Route path="marketplace" element={
+              <TierGuard appId="marketplace">
+                <Marketplace />
+              </TierGuard>
+            } />
             <Route path="marketplace/:id" element={<ListingDetail />} />
-            <Route path="order-studio" element={<OrderStudio />} />
-            <Route path="productivity-dashboard" element={<ProductivityDashboard />} />
+            <Route path="order-studio" element={
+              <TierGuard appId="order_studio">
+                <OrderStudio />
+              </TierGuard>
+            } />
+            <Route path="productivity-dashboard" element={
+              <TierGuard appId="productivity_dashboard">
+                <ProductivityDashboard />
+              </TierGuard>
+            } />
             
             {/* Other tools */}
-            <Route path="visualize-with-ai" element={<VisualizeWithAI />} />
-            <Route path="assistant" element={<Assistant />} />
-            <Route path="sourcing" element={<Sourcing />} />
-            <Route path="market" element={<Market />} />
-            <Route path="profit-predictor" element={<ProfitPredictor />} />
-            <Route path="trend-forecaster" element={<TrendForecaster />} />
-            <Route path="shipping-optimizer" element={<ShippingOptimizer />} />
-            <Route path="inventory-vision" element={<InventoryVision />} />
-            <Route path="moodboard-parser" element={<MoodboardParser />} />
-            <Route path="workflow-automator" element={<WorkflowAutomator />} />
-            <Route path="customer-retention" element={<CustomerRetention />} />
-            <Route path="reverse-engineer" element={<ReverseEngineer />} />
-            <Route path="validator" element={<Validator />} />
-            <Route path="wreath-remixer" element={<WreathRemixer />} />
-            <Route path="render-prompt-builder" element={<RenderPromptBuilder />} />
+            <Route path="visualize-with-ai" element={<TierGuard appId="visualize_with_ai"><VisualizeWithAI /></TierGuard>} />
+            <Route path="assistant" element={<TierGuard appId="assistant"><Assistant /></TierGuard>} />
+            <Route path="sourcing" element={<TierGuard appId="sourcing"><Sourcing /></TierGuard>} />
+            <Route path="market" element={<TierGuard appId="market"><Market /></TierGuard>} />
+            <Route path="profit-predictor" element={<TierGuard appId="profit_predictor"><ProfitPredictor /></TierGuard>} />
+            <Route path="trend-forecaster" element={<TierGuard appId="trend_forecaster"><TrendForecaster /></TierGuard>} />
+            <Route path="shipping-optimizer" element={<TierGuard appId="shipping_optimizer"><ShippingOptimizer /></TierGuard>} />
+            <Route path="inventory-vision" element={<TierGuard appId="inventory_vision"><InventoryVision /></TierGuard>} />
+            <Route path="moodboard-parser" element={<TierGuard appId="moodboard_parser"><MoodboardParser /></TierGuard>} />
+            <Route path="workflow-automator" element={<TierGuard appId="workflow_automator"><WorkflowAutomator /></TierGuard>} />
+            <Route path="customer-retention" element={<TierGuard appId="customer_retention"><CustomerRetention /></TierGuard>} />
+            <Route path="reverse-engineer" element={<TierGuard appId="reverse_engineer"><ReverseEngineer /></TierGuard>} />
+            <Route path="validator" element={<TierGuard appId="validator"><Validator /></TierGuard>} />
+            <Route path="wreath-remixer" element={<TierGuard appId="wreath_remixer"><WreathRemixer /></TierGuard>} />
+            <Route path="render-prompt-builder" element={<TierGuard appId="render_prompt_builder"><RenderPromptBuilder /></TierGuard>} />
             <Route path="success" element={<Success />} />
             <Route path="cancel" element={<Cancel />} />
           </Route>

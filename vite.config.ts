@@ -7,6 +7,29 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) {
+              return;
+            }
+
+            if (id.includes('firebase')) {
+              return 'firebase';
+            }
+
+            if (
+              id.includes('jspdf') ||
+              id.includes('html2canvas') ||
+              id.includes('dompurify')
+            ) {
+              return 'export-tools';
+            }
+          },
+        },
+      },
+    },
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

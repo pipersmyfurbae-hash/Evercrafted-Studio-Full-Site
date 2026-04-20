@@ -3,12 +3,16 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import multer from 'multer';
+import type { DecodedIdToken } from 'firebase-admin/auth';
 import { analyzeWreathImage } from './src/services/vision-flower-engine.ts';
 import { generateMotion } from './src/services/motionEngine.ts';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
+import Stripe from 'stripe';
 import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
+import { createCheckoutSession, constructWebhookEvent } from './src/services/server/stripe-service.ts';
+import { recordPurchase } from './src/services/server/purchase-verification.ts';
 
 // Initialize Firebase Admin
 admin.initializeApp({
@@ -21,14 +25,177 @@ const storage = getStorage();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
 
+type AuthenticatedRequest = express.Request & {
+  user?: DecodedIdToken;
+};
+
+type RateLimitOptions = {
+  maxRequests: number;
+  windowMs: number;
+};
+
+function getBearerToken(req: express.Request): string | null {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return null;
+  }
+
+  return header.slice(7);
+}
+
+async function requireAuth(
+  req: AuthenticatedRequest,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  try {
+    const token = getBearerToken(req);
+    if (!token) {
+      res.status(401).json({ error: 'Missing bearer token' });
+      return;
+    }
+
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid or expired auth token' });
+  }
+}
+
+function requireBodyFields(fields: string[]) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') {
+      res.status(400).json({ error: 'Request body must be a JSON object' });
+      return;
+    }
+
+    for (const field of fields) {
+      if (payload[field] === undefined || payload[field] === null || payload[field] === '') {
+        res.status(400).json({ error: `Missing required field: ${field}` });
+        return;
+      }
+    }
+
+    next();
+  };
+}
+
+function createRateLimiter(options: RateLimitOptions) {
+  const requests = new Map<string, { count: number; resetAt: number }>();
+
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = `${req.ip}:${req.path}`;
+    const now = Date.now();
+    const existing = requests.get(key);
+
+    if (!existing || now > existing.resetAt) {
+      requests.set(key, {
+        count: 1,
+        resetAt: now + options.windowMs,
+      });
+      next();
+      return;
+    }
+
+    if (existing.count >= options.maxRequests) {
+      res.status(429).json({
+        error: 'Too many requests, please try again later.',
+      });
+      return;
+    }
+
+    existing.count += 1;
+    next();
+  };
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.post(
+    '/payments/stripe/webhook',
+    express.raw({ type: 'application/json' }),
+    async (req, res) => {
+      try {
+        const event = constructWebhookEvent(
+          req.body as Buffer,
+          req.headers['stripe-signature']
+        );
+
+        const processedRef = db.collection('stripeWebhookEvents').doc(event.id);
+        const processedDoc = await processedRef.get();
+        if (processedDoc.exists) {
+          res.json({ received: true, duplicate: true });
+          return;
+        }
+
+        if (event.type === 'checkout.session.completed') {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const userId = session.metadata?.userId;
+          const blueprintId = session.metadata?.blueprintId;
+
+          if (userId && blueprintId) {
+            await recordPurchase(userId, blueprintId, session.id);
+          }
+        }
+
+        await processedRef.set({
+          eventId: event.id,
+          type: event.type,
+          processedAt: new Date().toISOString(),
+        });
+
+        res.json({ received: true });
+      } catch (error) {
+        console.error('Stripe webhook error:', error);
+        res.status(400).send('Webhook Error');
+      }
+    }
+  );
+
+  app.use(express.json({ limit: '10mb' }));
+
+  const aiRouteLimiter = createRateLimiter({ maxRequests: 30, windowMs: 60_000 });
+  const mediaRouteLimiter = createRateLimiter({ maxRequests: 10, windowMs: 60_000 });
+  const projectRouteLimiter = createRateLimiter({ maxRequests: 60, windowMs: 60_000 });
+
+  app.get('/health', (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.post(
+    '/payments/checkout-session',
+    projectRouteLimiter,
+    requireAuth,
+    requireBodyFields(['id', 'title', 'price']),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const userId = req.user?.uid;
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+
+        const { id, title, price } = req.body;
+        const checkoutUrl = await createCheckoutSession({
+          id: String(id),
+          title: String(title),
+          price: Number(price),
+          userId,
+        });
+        res.json({ checkoutUrl });
+      } catch (error) {
+        console.error('Checkout session error:', error);
+        res.status(500).json({ error: 'Failed to create checkout session' });
+      }
+    }
+  );
 
   // Blueprint Routes
-  app.post('/blueprint/create', async (req, res) => {
+  app.post('/blueprint/create', aiRouteLimiter, requireBodyFields(['prompt', 'formula', 'inventory', 'diameter']), async (req, res) => {
     try {
       const { prompt, formula, inventory, diameter } = req.body;
       const response = await ai.models.generateContent({
@@ -46,7 +213,7 @@ async function startServer() {
     }
   });
 
-  app.post('/blueprint/from-emotion', async (req, res) => {
+  app.post('/blueprint/from-emotion', aiRouteLimiter, requireBodyFields(['prompt']), async (req, res) => {
     try {
       const { prompt } = req.body;
       const response = await ai.models.generateContent({
@@ -64,7 +231,7 @@ async function startServer() {
     }
   });
 
-  app.post('/blueprint/from-inventory', async (req, res) => {
+  app.post('/blueprint/from-inventory', aiRouteLimiter, requireBodyFields(['blueprint', 'inventory']), async (req, res) => {
     try {
       const { blueprint, inventory } = req.body;
       const response = await ai.models.generateContent({
@@ -83,7 +250,7 @@ async function startServer() {
   });
 
   // Vision Routes
-  app.post('/vision/analyze', upload.single('image'), async (req: any, res: any) => {
+  app.post('/vision/analyze', mediaRouteLimiter, upload.single('image'), async (req: any, res: any) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
       const base64Image = req.file.buffer.toString('base64');
@@ -96,7 +263,7 @@ async function startServer() {
   });
 
   // Placement Routes (QACS AI)
-  app.post('/ai/placement', async (req, res) => {
+  app.post('/ai/placement', aiRouteLimiter, requireBodyFields(['prompt', 'wreathSize']), async (req, res) => {
     try {
       const { prompt, wreathSize } = req.body;
       const response = await ai.models.generateContent({
@@ -111,7 +278,7 @@ async function startServer() {
   });
 
   // Motion Routes
-  app.post('/motion/emotion-detect', async (req, res) => {
+  app.post('/motion/emotion-detect', aiRouteLimiter, requireBodyFields(['description']), async (req, res) => {
     try {
       const { description } = req.body;
       const response = await ai.models.generateContent({
@@ -125,7 +292,7 @@ async function startServer() {
     }
   });
 
-  app.post('/motion/brief', async (req, res) => {
+  app.post('/motion/brief', aiRouteLimiter, requireBodyFields(['description']), async (req, res) => {
     try {
       const { description } = req.body;
       const response = await ai.models.generateContent({
@@ -139,7 +306,7 @@ async function startServer() {
     }
   });
 
-  app.post('/motion/generate', async (req, res) => {
+  app.post('/motion/generate', mediaRouteLimiter, requireBodyFields(['projectId']), async (req, res) => {
     try {
       const { projectId, motion_type, motion_intensity } = req.body;
       if (!projectId) return res.status(400).json({ error: 'projectId is required' });
@@ -197,27 +364,102 @@ async function startServer() {
   });
 
   // Project Routes
-  app.post('/project/save', async (req, res) => {
+  app.post('/project/save', projectRouteLimiter, requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const { projectId, projectData } = req.body;
-      res.json({ status: 'success', message: 'Project saved' });
+      const authUserId = req.user?.uid;
+      if (!authUserId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const { projectData } = req.body;
+      if (!projectData || typeof projectData !== 'object') {
+        res.status(400).json({ error: 'projectData is required' });
+        return;
+      }
+
+      const {
+        id,
+        name,
+        status,
+        description = '',
+        deadline = '',
+        createdAt = new Date().toISOString(),
+      } = projectData;
+
+      if (!id || !name || !status) {
+        res.status(400).json({ error: 'Project id, name, and status are required' });
+        return;
+      }
+
+      const projectRef = db.collection('projects').doc(String(id));
+      const existingDoc = await projectRef.get();
+      if (existingDoc.exists && existingDoc.data()?.userId !== authUserId) {
+        res.status(403).json({ error: 'You do not have access to this project' });
+        return;
+      }
+
+      const normalizedProject = {
+        id: String(id),
+        userId: authUserId,
+        name: String(name),
+        description: String(description),
+        status: String(status),
+        deadline: String(deadline),
+        createdAt: existingDoc.exists ? existingDoc.data()?.createdAt || createdAt : createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await projectRef.set(normalizedProject, { merge: true });
+      res.json({ status: 'success', project: normalizedProject });
     } catch (error) {
       res.status(500).json({ error: 'Failed to save project' });
     }
   });
 
-  app.get('/project/list', async (req, res) => {
+  app.get('/project/list', projectRouteLimiter, requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      res.json({ projects: [] });
+      const authUserId = req.user?.uid;
+      if (!authUserId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const snapshot = await db
+        .collection('projects')
+        .where('userId', '==', authUserId)
+        .orderBy('createdAt', 'desc')
+        .get();
+
+      const projects = snapshot.docs.map((doc) => doc.data());
+      res.json({ projects });
     } catch (error) {
       res.status(500).json({ error: 'Failed to list projects' });
     }
   });
 
-  app.get('/project/:id', async (req, res) => {
+  app.get('/project/:id', projectRouteLimiter, requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
-      res.json({ project: { id } });
+      const authUserId = req.user?.uid;
+      if (!authUserId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const projectDoc = await db.collection('projects').doc(id).get();
+      if (!projectDoc.exists) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      const project = projectDoc.data();
+      if (project?.userId !== authUserId) {
+        res.status(403).json({ error: 'You do not have access to this project' });
+        return;
+      }
+
+      res.json({ project });
     } catch (error) {
       res.status(500).json({ error: 'Failed to get project' });
     }

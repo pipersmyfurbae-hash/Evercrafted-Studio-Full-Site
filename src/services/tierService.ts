@@ -1,4 +1,5 @@
 export type Tier = 'free' | 'bloom' | 'craft' | 'studio' | 'pro';
+export type ExternalTier = Tier | 'enterprise';
 
 export interface TierLimits {
   designsPerMonth: number;
@@ -73,4 +74,31 @@ export function checkFeatureAccess(tier: Tier, feature: keyof TierLimits): boole
 
 export function checkUsageLimit(currentUsage: number, tier: Tier): boolean {
   return currentUsage < TIER_CONFIG[tier].designsPerMonth;
+}
+
+const TIER_RANK: Record<Tier, number> = {
+  free: 0,
+  bloom: 1,
+  craft: 2,
+  studio: 3,
+  pro: 4,
+};
+
+export function normalizeTier(rawTier?: string): Tier {
+  switch (rawTier) {
+    case 'bloom':
+    case 'craft':
+    case 'studio':
+    case 'pro':
+    case 'free':
+      return rawTier;
+    case 'enterprise':
+      return 'pro';
+    default:
+      return 'free';
+  }
+}
+
+export function hasTierAccess(userTier: Tier, requiredTier: Tier): boolean {
+  return TIER_RANK[userTier] >= TIER_RANK[requiredTier];
 }

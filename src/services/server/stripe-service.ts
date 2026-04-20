@@ -21,6 +21,7 @@ export async function createCheckoutSession(item: {
   id: string;
   title: string;
   price: number;
+  userId: string;
 }) {
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
@@ -42,7 +43,27 @@ export async function createCheckoutSession(item: {
 
     success_url: `${process.env.BASE_URL}/success?item=${item.id}`,
     cancel_url: `${process.env.BASE_URL}/cancel`,
+    metadata: {
+      blueprintId: item.id,
+      userId: item.userId,
+    },
   });
 
   return session.url;
+}
+
+export function constructWebhookEvent(
+  payload: Buffer,
+  signature: string | string[] | undefined
+) {
+  const stripe = getStripe();
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required");
+  }
+  if (!signature || Array.isArray(signature)) {
+    throw new Error("Invalid Stripe signature header");
+  }
+
+  return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 }

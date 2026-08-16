@@ -25,7 +25,7 @@ export default function InventoryVision() {
     if (!image) return;
     setIsAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const base64Data = image.split(',')[1];
       
       const response = await ai.models.generateContent({

@@ -13,7 +13,7 @@ export default function ReverseEngineer() {
   const handleRun = async () => {
     setLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = "gemini-3.1-pro-preview";
       
       const response = await ai.models.generateContent({

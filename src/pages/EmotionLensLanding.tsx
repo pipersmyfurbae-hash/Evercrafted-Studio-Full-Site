@@ -35,7 +35,7 @@ export default function EmotionLensLanding() {
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = "gemini-3-flash-preview";
       
       const emotionContext = Object.entries(weights)

@@ -203,7 +203,7 @@ export default function DesignStudio() {
     if (!localBlueprint) return;
     setIsGeneratingImage(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = 'gemini-3.1-flash-image-preview';
       
       const response = await ai.models.generateContent({
@@ -409,7 +409,7 @@ export default function DesignStudio() {
     if (!localBlueprint) return;
     setIsGeneratingPalette(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = "gemini-3-flash-preview";
       
       const response = await ai.models.generateContent({
@@ -450,7 +450,7 @@ export default function DesignStudio() {
     }
     setIsGeneratingTexture(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = "gemini-3-flash-preview";
       
       const response = await ai.models.generateContent({
@@ -484,7 +484,7 @@ export default function DesignStudio() {
   const handleBalanceSuggestions = async () => {
     setIsGeneratingSuggestions(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = "gemini-3-flash-preview";
       
       const response = await ai.models.generateContent({
@@ -548,7 +548,7 @@ export default function DesignStudio() {
       reader.readAsDataURL(file);
       reader.onloadend = async () => {
         const base64Image = reader.result as string;
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
         const model = "gemini-3.1-flash-image-preview";
         
         const response = await ai.models.generateContent({

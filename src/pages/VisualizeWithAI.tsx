@@ -43,7 +43,7 @@ export default function VisualizeWithAI() {
   const location = useLocation();
   const blueprintId = location.state?.blueprintId;
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
 
   useEffect(() => {
     if (blueprintId) {

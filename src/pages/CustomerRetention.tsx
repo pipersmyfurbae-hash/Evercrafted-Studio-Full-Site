@@ -13,7 +13,7 @@ export default function CustomerRetention() {
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
       const model = "gemini-3-flash-preview";
       
       const response = await ai.models.generateContent({

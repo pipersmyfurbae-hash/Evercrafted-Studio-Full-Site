@@ -3,7 +3,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export async function analyzeWreathImage(imageUrl: string) {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
   
   // Extract base64 data from data URL if necessary
   let base64Data = imageUrl;

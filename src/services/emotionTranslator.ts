@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { EmotionProfile } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
 
 export const translateEmotion = async (emotionText: string): Promise<EmotionProfile> => {
   const model = "gemini-3-flash-preview";

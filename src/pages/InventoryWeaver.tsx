@@ -9,7 +9,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { createProject } from '../services/projectService';
 import { toast } from 'sonner';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
 
 export default function InventoryWeaver() {
   const { user } = useAuth();

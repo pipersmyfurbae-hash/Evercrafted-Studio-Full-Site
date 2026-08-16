@@ -13,7 +13,7 @@ import { db, auth } from '../lib/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { createProject } from '../services/projectService';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
 
 enum OperationType {
   CREATE = 'create',

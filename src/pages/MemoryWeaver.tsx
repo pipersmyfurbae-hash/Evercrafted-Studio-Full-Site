@@ -11,7 +11,7 @@ import { QualityGate } from '../components/QualityGate';
 import { runOrchestrator } from '../services/BlueprintOrchestrator';
 import { translateEmotion } from '../services/emotionTranslator';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
 
 enum OperationType {
   CREATE = 'create',

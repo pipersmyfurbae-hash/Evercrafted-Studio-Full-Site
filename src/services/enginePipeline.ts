@@ -11,7 +11,7 @@ import { buildRenderLayout } from './engine/evercrafted-engine';
 import { compileRenderPrompts } from './engine/render-compiler';
 import { buildInventoryPools, assignInventoryToBlueprint } from './engine/inventory-engine';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'missing-api-key' });
 
 export interface PipelineResult {
   emotionProfile: EmotionProfile;

@@ -38,6 +38,7 @@ export default function Layout() {
   ];
 
   const navItems = allNavItems.filter(item => {
+    if (!user) return true;
     if (userData?.role === 'admin' || user?.email === 'thebadencompany@gmail.com') return true;
     
     // If the item has a feature requirement, check it against the user's tier
@@ -100,27 +101,10 @@ export default function Layout() {
             })}
           </nav>
 
-          <div className="pt-8 border-t border-ink/5 space-y-8">
-            <div className="flex items-center gap-4">
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="Avatar" className="w-10 h-10 grayscale rounded-none" />
-              ) : (
-                <div className="w-10 h-10 bg-sage-ll text-sage-d flex items-center justify-center text-[10px] font-bold">
-                  {user?.displayName?.charAt(0) || 'U'}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest truncate text-ink">{user?.displayName}</p>
-                <p className="text-[9px] text-muted-studio/60 truncate uppercase tracking-tighter">{user?.email}</p>
-              </div>
-            </div>
-            <button 
-              className="text-[10px] uppercase tracking-[0.2em] w-full text-left hover:opacity-50 transition-opacity flex items-center gap-2 text-muted-studio"
-              onClick={logout}
-            >
-              <LogOut className="w-3 h-3" />
-              Sign Out
-            </button>
+          <div className="pt-8 border-t border-ink/5">
+            <p className="text-[9px] uppercase tracking-[0.2em] text-muted-studio/60">
+              Guest Studio · no account required
+            </p>
           </div>
         </div>
       </aside>

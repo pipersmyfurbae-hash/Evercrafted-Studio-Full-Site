@@ -26,9 +26,9 @@ export const TierGuard: React.FC<TierGuardProps> = ({
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  // Core Studio tools are available without sign-in. Account-based limits
+  // apply only after a user chooses to authenticate.
+  if (!user) return <>{children}</>;
 
   // Admin bypass
   if (userData?.role === 'admin' || user.email === 'thebadencompany@gmail.com') {

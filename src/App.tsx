@@ -50,7 +50,8 @@ import Projects from './pages/Projects';
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
-  if (!user) return <Navigate to="/login" />;
+  // Studio is intentionally usable without an account. Authentication remains available
+  // for optional account features, but it must never block the core workspace.
   return <>{children}</>;
 };
 
@@ -78,6 +79,11 @@ export default function App() {
               </TierGuard>
             } />
             <Route path="apps/studio" element={
+              <TierGuard feature="hasDesignStudio">
+                <DesignStudio />
+              </TierGuard>
+            } />
+            <Route path="blueprint-studio" element={
               <TierGuard feature="hasDesignStudio">
                 <DesignStudio />
               </TierGuard>

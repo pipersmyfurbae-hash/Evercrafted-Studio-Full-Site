@@ -1,0 +1,28 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    image: evercrafted-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Bind-mount the cloned source so edits are live.
+      - .:/app
+      # Keep installed deps out of the bind mount so they persist across restarts.
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DISABLE_HMR=false
+      # Bare var consumed by Vite >= 6.1 to allow the preview's external hostname.
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+      - BASE44_PUBLIC_HOST_SUFFIX
+      - BASE44_SANDBOX_HOST_DOMAIN
+    env_file:
+      # Repo-level placeholders — app boots without credentials. FIRST so real
+      # secrets below always win.
+      - ./.env.base44-defaults
+      # Platform-managed secrets (user-supplied). LAST, always wins.
+      - /run/base44/app.env
+    command: sh -c "if [ ! -d node_modules/canvas ]; then npm install; fi && npx tsx server.ts"
+    restart: unless-stopped

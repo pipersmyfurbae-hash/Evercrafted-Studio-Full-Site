@@ -11,12 +11,22 @@ import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 
 // Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
-  storageBucket: 'wreath-weaver.firebasestorage.app'
-});
-const db = getFirestore();
-const storage = getStorage();
+// Initialization is resilient: without application-default credentials (e.g. a
+// service account) the server still boots and serves the app. Firebase-backed
+// features (motion generation, project persistence) stay unavailable until real
+// credentials are provided via GOOGLE_APPLICATION_CREDENTIALS.
+let db: ReturnType<typeof getFirestore> | null = null;
+let storage: ReturnType<typeof getStorage> | null = null;
+try {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+    storageBucket: 'wreath-weaver.firebasestorage.app'
+  });
+  db = getFirestore();
+  storage = getStorage();
+} catch (err) {
+  console.warn('[firebase-admin] Could not initialize with default credentials. Firebase features will be unavailable until credentials are provided.');
+}
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const upload = multer({ storage: multer.memoryStorage() });
